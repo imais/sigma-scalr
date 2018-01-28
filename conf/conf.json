@@ -1,0 +1,26 @@
+{
+    "workload_files": {
+        "wcup"  : "data/workloads/wcup.tsv",
+        "tweets": "data/workloads/tweets.tsv",
+        "adsb"  : "data/workloads/adsb.tsv"
+    },
+    "norm_factors": {
+        "grep": 32.0, 
+        "rcount": 10.0, 
+        "visitor": 48.0, 
+        "pv": 46.0, 
+        "clean": 5.0, 
+        "vhtree": 49.0, 
+        "twitter": 200.0, 
+        "collision": -1.0
+    },
+    "mst_model_file": "data/mst/mst_model.tsv",
+    "mst_data_file": "data/mst/mst_data.tsv" ,
+    "startup_time": 1,
+    "reconfig_time": 1,
+    "cooldown_time": 5,
+    "lookahead_time": 10,
+    "t_start": 3,
+    "num_reports": 20
+}
+
