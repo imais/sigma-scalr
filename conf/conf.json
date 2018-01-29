@@ -16,11 +16,15 @@
     },
     "mst_model_file": "data/mst/mst_model.tsv",
     "mst_data_file": "data/mst/mst_data.tsv" ,
-    "startup_time": 1,
-    "reconfig_time": 1,
-    "cooldown_time": 5,
-    "lookahead_time": 10,
-    "t_start": 3,
+    "startup_steps": 1,
+    "reconfig_steps": 1,
+    "cooldown_steps": 5,
+    "lookahead_steps": 10,
+    "t_sim_start": 3,
     "num_reports": 20
+    "workload_window_size": 100,
+    "backlog_window_size": 10,
+    "backlog_scaleup_threshold": 10,
+    "backlog_scaledown_threshold": 3
 }
 

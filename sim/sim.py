@@ -7,15 +7,10 @@ from core.scalr import Scalr, ScalrState
 from mst_tru import MstTru
 
 
-log = logging.getLogger(__name__)
+log = logging.getLogger()
 
 
 class Sim(object):
-	def read_mst_data(self, mst_data_file, app):
-         df = pd.DataFrame.from_csv(mst_data_file, sep='\t', header=0)
-         return df.loc[df['app'] == app]
-
-
 	def read_workload(self, workload_file, norm_factor):
 		workload = pd.Series.from_csv(workload_file, sep='\t', header=0)
 		if norm_factor < 0:
@@ -26,12 +21,12 @@ class Sim(object):
 
 
 	def __init__(self, conf):
-		mst_df = self.read_mst_data(conf['mst_data_file'], conf['app'])
-		self.scalr = Scalr(conf, mst_df)  # initialize mst & workload forecast models
-		self.mst_tru = MstTru(mst_df)
+		self.mst_tru = MstTru(conf['mst_data_file'], conf['app'])
 		self.workload = self.read_workload(conf['workload_files'][conf['series']], 
 										   conf['norm_factors'][conf['app']])
 		self.timestep_sec = (self.workload[0:2].index[1] - self.workload[0:2].index[0]).total_seconds()
+		conf['timestep_sec'] = self.timestep_sec # scalr needs this to estimate future backlog
+		self.scalr = Scalr(conf)
 		self.backlog = 0
 		self.conf = conf
 		self.results = Results()
@@ -47,54 +42,55 @@ class Sim(object):
 	def start(self):
 		# T = self.workload.size
 		T = 50
-		t = self.conf['t_start']
+		t = self.conf['t_sim_start']
 		t_report = T / self.conf['num_reports']
 		m_curr = self.scalr.make_decision(self.workload[t], 1)
-		startup_time = 0
-		reconfig_time = 0
-		cooldown_time = 0
+		startup_steps = 0
+		reconfig_steps = 0
+		cooldown_steps = 0
 		state = ScalrState.READY
 
 		log.info('Starting simulation')
 
 		while t < T:
 			(backlog, mst_tru) = self.compute_backlog(m_curr, self.workload[t], self.timestep_sec)
-			self.scalr.set_backlog(backlog)
+			self.scalr.put_backlog(backlog)
 			self.results.add(self.workload.index[t], m_curr, self.workload[t], mst_tru, backlog)
 
 			log.debug('t={},\tstate={},\tm_curr={}'.format(t, state, m_curr))
 
 			if state == ScalrState.READY:
+				# we make scaling decisions only when we are in READY state
 				m_next = self.scalr.make_decision(self.workload[t], m_curr)
 				if m_curr < m_next:
 					state = ScalrState.STARTUP
-					startup_time = self.conf['startup_time']
+					startup_steps = self.conf['startup_steps']
 				elif m_curr > m_next:
 					state = ScalrState.RECONFIG
 					m_curr = 0
-					reconfig_time = self.conf['reconfig_time']
-				# if m_curr == m_next, stay READY state
+					reconfig_steps = self.conf['reconfig_steps']
+				# if m_curr == m_next, stay in READY state
 
 			elif state == ScalrState.STARTUP:
-				if 0 < startup_time:
-					startup_time -= 1
-				if startup_time == 0:
+				if 0 < startup_steps:
+					startup_steps -= 1
+				if startup_steps == 0:
 					state = ScalrState.RECONFIG					
 					m_curr = 0
-					reconfig_time = self.conf['reconfig_time']
+					reconfig_steps = self.conf['reconfig_steps']
 
 			elif state == ScalrState.RECONFIG:
-				if 0 < reconfig_time:
-					reconfig_time -= 1
-				if reconfig_time == 0:
-					cooldown_time = self.conf['cooldown_time']
+				if 0 < reconfig_steps:
+					reconfig_steps -= 1
+				if reconfig_steps == 0:
+					cooldown_steps = self.conf['cooldown_steps']
 					state = ScalrState.COOLDOWN
 					m_curr = m_next
 					
 			elif state == ScalrState.COOLDOWN:
-				if 0 < cooldown_time:
-					cooldown_time -= 1
-				if cooldown_time == 0:
+				if 0 < cooldown_steps:
+					cooldown_steps -= 1
+				if cooldown_steps == 0:
 					state = ScalrState.READY
 
 			else:

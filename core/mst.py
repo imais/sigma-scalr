@@ -1,29 +1,55 @@
+import logging
 import sys
 import numpy as np
 from lsqnonneg import lsqnonneg
 from scipy.stats import norm
 
-class MstModel(object):
-	supported_models = ['model1', 'model2']
+log = logging.getLogger()
 
-	def __init__(self, id, m_train, mst_train, m_max):
-		if not id in self.supported_models:
-			sys.exit("Specified model {} not supported".format(id))
-		self.id = id
-		self.m_max = m_max
-		self.m_train = m_train
-		self.mst_train = mst_train
+
+class MstModel(object):
+	SUPPORTED_MODELS = ['model1', 'model2']
+
+	def __init__(self, data_file, model_file, model_id, app):
+		if not model_id in self.SUPPORTED_MODELS:
+			sys.exit("Specified model {} not supported".format(model_id))
+		self.id = model_id
+
+		mst_df = self.__read_mst_data(data_file, app)
+		training_subset = self.__read_mst_training_subset(model_file, model_id, app)
+		filtered_df = mst_df.loc[mst_df['m'].isin(training_subset)]
+		filtered_df = pd.melt(filtered_df.iloc[:, 1:], id_vars='m')
+
+		self.m_max = max(mst_df['m'])
+		self.m_train = np.array(filtered_df.loc[:, 'm'])
+		self.mst_train = np.array(filtered_df.loc[:, 'value'])
 		self.num_training = 0
-		self.train()
+		self.__train()
+
+		log.info('model_id={}, app={}, weights={}, std={}'
+				 .format(model_id, app, self.weights, self.std))
 
 		
-	def train(self):
+	def __read_mst_data(self, data_file, app):
+         df = pd.DataFrame.from_csv(data_file, sep='\t', header=0)
+         return df.loc[df['app'] == app]
+
+
+	def __read_mst_training_subset(self, model_file, model_id, app):
+		df = pd.DataFrame.from_csv(model_file, sep='\t', header=0)
+		subset_df = df.loc[(df['model'] == model_id) & (df['app'] == app), 'training_subset']
+		subset_csv = subset_df.iloc[0] # dataframe to string
+		return np.array([float(w) for w in subset_csv.split(",")])
+
+
+	def __train(self):
 		if self.id == 'model1':
 			Z = np.array([[1., 1./x, x, x**2] for x in self.m_train])
 			y = np.array([1/y for y in self.mst_train])
 		elif self.id == 'model2':
 			Z = np.array([[1., x, -(x**2)] for x in self.m_train])			
 			y = self.mst_train
+		residual = .0
 		try:
 			(weights, resnorm, residual) = lsqnonneg(Z, y, itmax_factor=10)
 		except Exception:
@@ -31,38 +57,24 @@ class MstModel(object):
 			pass
 		else:
 			self.weights = weights
-			self.mst = self.compute_mst(self.m_train)
-			self.std = self.compute_std(self.m_train, self.mst_train)
+			self.resnorm = resnorm
+			self.residual = residual
+			self.mst = self.__compute_mst(self.m_train)
+			self.std = self.__compute_std(self.m_train, self.mst_train)
 			self.num_training += 1
+			self.ready = True
 
 
-	def update(self, m_train, mst_train):
-		# Assume both m & mst are float numbers
-		self.m_max = max(m_train, self.m_max)
-		self.m_train = np.append(self.m_train, m_train)
-		self.mst_train = np.append(self.mst_train, mst_train)
-		self.train()
-
-	def compute_mst(self, m):
+	def __compute_mst(self, m):
 		mst_peak = 0
 		mst = [0]  # mst(0) = 0
 		for m_ in range(1, self.m_max+1):
-			mst_peak = max(self.compute(m_), mst_peak)
+			mst_peak = max(self.__compute(m_), mst_peak)
 			mst.append(mst_peak)
 		return mst
 
 
-	def compute_std(self, m, mst):
-		# compute predicion variance: SSE/(n-k)
-		mst_hat = [self.predict(m_) for m_ in m]
-		sse = 0.0
-		sse += ((mst - mst_hat)**2).sum()
-		n = len(mst)
-		k = len(self.weights)
-		return np.sqrt(sse/(n - k))
-
-
-	def compute(self, m):
+	def __compute(self, m):
 		if self.id == 'model1':
 			z = np.array([1., 1./m, m, m**2])
 			mst = 1 / np.dot(z, self.weights)
@@ -74,35 +86,23 @@ class MstModel(object):
 		return mst
 
 
+	def __compute_std(self, m, mst):
+		# compute predicion variance: SSE/(n-k)
+		mst_hat = [self.predict(m_) for m_ in m]
+		sse = 0.0
+		sse += ((mst - mst_hat)**2).sum()
+		n = len(mst)
+		k = len(self.weights)
+		return np.sqrt(sse/(n - k))
+
+
+	def update(self, m_train, mst_train):
+		# Assume both m & mst are float numbers
+		self.m_max = max(m_train, self.m_max)
+		self.m_train = np.append(self.m_train, m_train)
+		self.mst_train = np.append(self.mst_train, mst_train)
+		self.train()
+
+
 	def predict(self, m):
-		return self.mst[m]
-
-
-class MstTru(object):
-	# ground truth computation - take average and linear interpolation? or actually run all the configs?
-
-	def __init__(self, mst_df, random_sampling=True):
-		# compute mean over all samples
-		mst_mean = mst_df.iloc[:, 2:].mean(axis=1) 
-		mst_std = mst_df.iloc[:, 2:].std(axis=1)
-		self.m_max = max(mst_df['m'])
-
-		# linearly interpolate mean and std, both arrays are 0-based
-		self.mst_mean = np.interp(range(0, self.m_max + 1), mst_df['m'], mst_mean)
-		self.mst_std = np.interp(range(0, self.m_max + 1), mst_df['m'], mst_std)
-
-		self.random_sampling = random_sampling
-
-
-	def sample(self, m):
-		if m < 0 or self.m_max < m:
-			return 0
-		elif self.random_sampling:
-			while True:
-				rnd = norm.rvs(loc=self.mst_mean[m - 1], scale=self.mst_std[m - 1], size=1)
-				if (0 < rnd):
-					break;
-			return rnd
-		else:
-			return self.mst_mean[m - 1] 
-
+		return self.mst[m] if self.ready else 1

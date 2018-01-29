@@ -6,7 +6,7 @@ import os
 from ast import literal_eval as make_tuple
 from sim.sim import Sim
 
-log = logging.getLogger(__name__)
+log = logging.getLogger()
 
 
 def setup_logger(path='./conf/log.json', level=logging.INFO):
@@ -26,11 +26,13 @@ def parse_args():
 	parser.add_argument('-p',	'--arima_pdq', default='(1,0,0)', type=str)
 	parser.add_argument('-n',	'--num_tests', default=1, type=int)
 	parser.add_argument('-r',	'--rho', default=0.95, type=float)
-	parser.add_argument('-mua',	'--mst_uncertainty_aware', action='store_true')
-	parser.add_argument('-fua', '--forecast_uncertainty_aware', action='store_true')
-	parser.add_argument('-ol',  '--online_learning', action='store_true')
 	parser.add_argument('-cf',	'--conf', default='./conf/conf.json', type=str)
 	parser.add_argument('-sim', '--simulation', action='store_true')
+	# scheduling options
+	parser.add_argument('-mua',	'--mst_uncertainty_aware', action='store_true')
+	parser.add_argument('-fua', '--forecast_uncertainty_aware', action='store_true')
+	parser.add_argument('-ba', '--backlog_aware', action='store_true')
+	parser.add_argument('-ol',  '--online_learning', action='store_true')
 	args = parser.parse_args()
 	args.arima_pdq = make_tuple(args.arima_pdq)
 
