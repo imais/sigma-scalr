@@ -18,13 +18,14 @@
     "mst_data_file": "data/mst/mst_data.tsv" ,
     "startup_steps": 1,
     "reconfig_steps": 1,
-    "cooldown_steps": 5,
+    "cooldown_steps": 20,
     "lookahead_steps": 10,
     "t_sim_start": 3,
-    "num_reports": 20
+    "num_reports": 20,
     "workload_window_size": 100,
     "backlog_window_size": 10,
-    "backlog_scaleup_threshold": 10,
-    "backlog_scaledown_threshold": 3
+    "backlog_scaleup_threshold": 20,
+    "backlog_scaledown_threshold": 5,
+    "results_file": "results.txt"
 }
 

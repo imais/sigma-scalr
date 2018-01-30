@@ -3,7 +3,7 @@
 import logging
 import pandas as pd
 from util.results import Results
-from core.scalr import Scalr, ScalrState
+from core.scalr import Scalr, ScalrState, ScalrOp
 from mst_tru import MstTru
 
 
@@ -32,7 +32,7 @@ class Sim(object):
 		self.results = Results()
 	
 
-	def compute_backlog(self, m, workload, time):
+	def compute_backlog(self, workload, m, time):
 		mst_tru = self.mst_tru.sample(m)
 		delta = (workload - mst_tru) * time
 		self.backlog = max(self.backlog + delta, 0)
@@ -40,35 +40,38 @@ class Sim(object):
 
 
 	def start(self):
+		log.info('Starting simulation')
+
 		# T = self.workload.size
-		T = 50
+		T = 200
 		t = self.conf['t_sim_start']
 		t_report = T / self.conf['num_reports']
-		m_curr = self.scalr.make_decision(self.workload[t], 1)
+		m_curr, op = self.scalr.make_decision(self.workload[t], 1)
 		startup_steps = 0
 		reconfig_steps = 0
 		cooldown_steps = 0
 		state = ScalrState.READY
 
-		log.info('Starting simulation')
-
 		while t < T:
-			(backlog, mst_tru) = self.compute_backlog(m_curr, self.workload[t], self.timestep_sec)
+			(backlog, mst_tru) = self.compute_backlog(self.workload[t], m_curr, self.timestep_sec)
+			self.scalr.put_workload(self.workload[t])
 			self.scalr.put_backlog(backlog)
 			self.results.add(self.workload.index[t], m_curr, self.workload[t], mst_tru, backlog)
 
-			log.debug('t={},\tstate={},\tm_curr={}'.format(t, state, m_curr))
+			log.debug('t={},\tstate={}, m_curr={}, workload={}, mst={}, backlog={}'.format(t, state, m_curr, self.workload[t], mst_tru, backlog))
 
 			if state == ScalrState.READY:
 				# we make scaling decisions only when we are in READY state
-				m_next = self.scalr.make_decision(self.workload[t], m_curr)
-				if m_curr < m_next:
+				m_next, op = self.scalr.make_decision(self.workload[t], m_curr)
+				if op == ScalrOp.UP and m_curr < m_next:
 					state = ScalrState.STARTUP
 					startup_steps = self.conf['startup_steps']
-				elif m_curr > m_next:
+					log.debug('\t### SCALING UP ###: {} -> {}'.format(m_curr, m_next))
+				elif op == ScalrOp.DOWN and m_curr > m_next:
 					state = ScalrState.RECONFIG
-					m_curr = 0
 					reconfig_steps = self.conf['reconfig_steps']
+					log.debug('\t### SCALING DOWN ###: {} -> {}'.format(m_curr, m_next))
+					m_curr = 0
 				# if m_curr == m_next, stay in READY state
 
 			elif state == ScalrState.STARTUP:
@@ -102,6 +105,9 @@ class Sim(object):
 
 		log.info('Finished simulation')
 		self.results.print_stats()
+		if 'results_file' in self.conf:
+			log.info('Writing results to {}'.format(self.conf['results_file']))
+			self.results.write_results(self.conf['results_file'])
 		
 					
 			

@@ -1,6 +1,7 @@
 import logging
-import sys
 import numpy as np
+import sys
+import pandas as pd
 from lsqnonneg import lsqnonneg
 from scipy.stats import norm
 
@@ -24,6 +25,7 @@ class MstModel(object):
 		self.m_train = np.array(filtered_df.loc[:, 'm'])
 		self.mst_train = np.array(filtered_df.loc[:, 'value'])
 		self.num_training = 0
+		self.ready = False
 		self.__train()
 
 		log.info('model_id={}, app={}, weights={}, std={}'

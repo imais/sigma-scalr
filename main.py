@@ -31,7 +31,8 @@ def parse_args():
 	# scheduling options
 	parser.add_argument('-mua',	'--mst_uncertainty_aware', action='store_true')
 	parser.add_argument('-fua', '--forecast_uncertainty_aware', action='store_true')
-	parser.add_argument('-ba', '--backlog_aware', action='store_true')
+	parser.add_argument('-ba',	'--backlog_aware', action='store_true')
+	parser.add_argument('-bua',	'--backlog_uncertainty_aware', action='store_true')
 	parser.add_argument('-ol',  '--online_learning', action='store_true')
 	args = parser.parse_args()
 	args.arima_pdq = make_tuple(args.arima_pdq)
@@ -46,6 +47,8 @@ def init_conf(args):
 			conf = dict(json.load(f).items() + vars(args).items())
 	else:
 		conf = args
+	if 'backlog_uncertainty_aware' in conf and conf['backlog_uncertainty_aware']:
+		conf['backlog_aware'] = True
 
 	return conf
 

@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from scipy.stats import norm
 
 
@@ -8,7 +9,7 @@ class MstTru(object):
          return df.loc[df['app'] == app]
 
 	def __init__(self, mst_data_file, app):
-		mst_df = __read_mst_data(mst_data_file, app)
+		mst_df = self.__read_mst_data(mst_data_file, app)
 
 		# compute mean over all samples
 		mst_mean = mst_df.iloc[:, 2:].mean(axis=1) 
@@ -21,11 +22,11 @@ class MstTru(object):
 
 
 	def sample(self, m):
-		if m < 0 or self.m_max < m:
+		if m <= 0 or self.m_max < m:
 			return 0
 
 		while True:
-			rnd = norm.rvs(loc=self.mst_mean[m - 1], scale=self.mst_std[m - 1], size=1)
+			rnd = norm.rvs(loc=self.mst_mean[m - 1], scale=self.mst_std[m - 1], size=1)[0]
 			if (0 < rnd):
 				break;
 

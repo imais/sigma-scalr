@@ -1,4 +1,8 @@
+import logging
+import numpy as np
 import statsmodels.api as sm
+
+log = logging.getLogger()
 
 class ARIMA(object):
 	stationarity = False
@@ -28,14 +32,16 @@ class ARIMA(object):
 												  enforce_stationarity=ARIMA.stationarity,
 												  enforce_invertibility=ARIMA.invertibility)
 			self.results = model.fit(disp=False)
-		except:
-			pass # do nothing
+		except Exception as ex:
+			# pass # do nothing
+			log.warn('SARIMAX model fit failed: {}'.format(ex))
+			return np.nan, np.nan, np.nan
 
 		# print("model.nobs={}, freq={}".format(model.nobs, self.results.model.data.freq))
 		pred = self.results.get_prediction(start=model.nobs, end=model.nobs + steps_ahead - 1)
 		pred_val = pred.predicted_mean
 		pred_ci = pred.conf_int(alpha=0.05)
-		upper_lim = pred_ci.iloc[:, 1]
+		upper_lim = pred_ci['upper y']
 		# 1.96 is z* for 95% confidence interval
 		std = (upper_lim - pred_val) / 1.96
 		
