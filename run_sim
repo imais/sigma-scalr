@@ -1,1 +1,1 @@
-python main.py -sim -bua
+python src/main.py -sim -bua
