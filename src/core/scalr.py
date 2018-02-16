@@ -5,6 +5,7 @@ from enum import Enum
 from random import randint
 from core.mst import MstModel
 from core.arima import ARIMA
+from scipy.stats import norm
 
 log = logging.getLogger()
 
@@ -88,14 +89,13 @@ class Scalr(object):
 
 			variance = 0.0
 			if self.conf['mst_uncertainty_aware']:
-				variance += mst_model.std**2
+				variance += self.mst_model.std**2
 			if self.conf['forecast_uncertainty_aware']:
 				variance += workload_std**2
 
 			if 0 < variance:
 				std = np.sqrt(variance)
 				prob = norm.sf(x=0, loc=delta, scale=std)   # survival function: 1-cdf
-				# print("m={}, mst_mu={}, demand_mu={}, mu={}, std={}, prob={}, RHO={}".format(m, mst_mu, demand_mu, mu, std, prob, RHO))
 				if self.conf['rho'] <= prob:
 					break
 			elif 0 <= delta:
@@ -176,7 +176,7 @@ class Scalr(object):
 			return self.__estimate_m(workload)
 		
 		# pick up the max workload in the next lookahead steps
-		upper_lim = ci.iloc[:, 1]
+		upper_lim = ci['upper y']
 		max_index = upper_lim.loc[upper_lim == upper_lim.max()].index[0]
 		workload = forecast[max_index]
 		workload_std = std[max_index]

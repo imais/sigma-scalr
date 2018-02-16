@@ -42,8 +42,7 @@ class Sim(object):
 	def start(self):
 		log.info('Starting simulation')
 
-		# T = self.workload.size
-		T = 200
+		T = self.workload.size
 		t = self.conf['t_sim_start']
 		t_report = T / self.conf['num_reports']
 		m_curr, op = self.scalr.make_decision(self.workload[t], 1)
@@ -99,8 +98,8 @@ class Sim(object):
 			else:
 				log.error('Invalid state: {}'.format(str(state)))
 
-			# if t % t_report == 0:
-			# 	log.info('{}% ({}/{}) done'.format(round(100 * float(t)/T), t, T))
+			if t % t_report == 0:
+				log.info('{}% ({}/{}) done'.format(round(100 * float(t)/T), t, T))
 			t += 1
 
 		log.info('Finished simulation')

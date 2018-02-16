@@ -35,7 +35,6 @@ def parse_args():
 	parser.add_argument('-bua',	'--backlog_uncertainty_aware', action='store_true')
 	parser.add_argument('-ol',  '--online_learning', action='store_true')
 	args = parser.parse_args()
-	args.arima_pdq = make_tuple(args.arima_pdq)
 
 	return args
 
@@ -45,12 +44,18 @@ def init_conf(args):
 		with open(args.conf, 'rt') as f:
 			# args have priority over settings in conf
 			conf = dict(json.load(f).items() + vars(args).items())
+			conf['arima_pdq'] = make_tuple(conf['arima_pdq'])
 	else:
 		conf = args
-	if 'backlog_uncertainty_aware' in conf and conf['backlog_uncertainty_aware']:
+	if conf['backlog_uncertainty_aware']:
 		conf['backlog_aware'] = True
 
 	return conf
+
+
+def check_conf(conf):
+	if conf['backlog_aware']:
+		assert(not(conf['mst_uncertainty_aware'] or conf['forecast_uncertainty_aware']))
 
 
 def main(conf):
@@ -66,4 +71,5 @@ if __name__ == '__main__':
 	setup_logger()
 	args = parse_args()
 	conf = init_conf(args)
+	check_conf(conf)
 	main(conf)
