@@ -38,6 +38,23 @@ class Scalr(object):
 		self.workload_window = Queue.Queue()
 		self.backlog_window = Queue.Queue()
 		self.conf = conf
+		self.effective_mst_dict = {}
+
+
+	def __compute_effective_mst(self, m_curr, m_next, S, D, L):
+		# S: Startup time, D: Downtime, L: Lookahead time
+		if (m_curr,m_next,S,D,L) in self.effective_mst_dict:
+			return self.effective_mst_dict[(m_curr,m_next,S,D,L)]
+
+		# m vs. time:
+		# m: | m_curr |  0  | m_next |
+		# t: |<--S--->|<-D->| 
+		# t: |<----------L---------->|
+		total_mst = self.mst_model.predict(m_curr) * S
+		total_mst += self.mst_model.predict(m_next) * (L - (S + D))
+		effective_mst = total_mst / L
+		self.effective_mst_dict[(m_curr,m_next,S,D,L)] = effective_mst
+		return effective_mst
 
 
 	def __put_workload(self, workload):
@@ -82,9 +99,15 @@ class Scalr(object):
 		return forecast, ci, std
 		
 
-	def __estimate_m(self, workload_pred, workload_std=0.0):
+	def __estimate_m(self, workload_pred, workload_std=0.0, m_curr=0):
 		for m in range(1, self.mst_model.m_max+1):
-			mst_pred = self.mst_model.predict(m)
+			if self.conf['forecast_effective_mst']:
+				S = self.conf['startup_steps'] if m > m_curr else 0
+				D = self.conf['reconfig_steps']
+				L = self.conf['lookahead_steps']
+				mst_pred = self.__compute_effective_mst(m_curr, m, S, D, L)
+			else:
+				mst_pred = self.mst_model.predict(m)
 			delta = mst_pred - workload_pred
 
 			variance = 0.0
@@ -117,6 +140,8 @@ class Scalr(object):
 
 
 	def __estimate_m_backlog_aware(self, workload, m_curr, op):
+		assert((op == ScalrOp.DOWN) or (op == ScalrOp.UP))
+
 		forecast, ci, std = self.__forecast_workload(self.conf['lookahead_steps'])
 
 		if forecast is np.nan:
@@ -168,7 +193,7 @@ class Scalr(object):
 		return m if m_found else self.mst_model.m_max
 
 
-	def __estimate_m_forecast_uncertainty_aware(self, workload):
+	def __estimate_m_forecast_uncertainty_aware(self, workload, m_curr):
 		forecast, ci, std = self.__forecast_workload(self.conf['lookahead_steps'])
 
 		if forecast is np.nan:
@@ -181,22 +206,25 @@ class Scalr(object):
 		workload = forecast[max_index]
 		workload_std = std[max_index]
 
-		return self.__estimate_m(workload, workload_std)
+		return self.__estimate_m(workload, workload_std, m_curr, op)
 
 	
 	def make_decision(self, workload, m_curr):
 		m = m_curr
 
-		# check scaling trigger conditions from backlog
-		op = self.__check_scaling_trigger()
+		if self.conf['fixed_interval_scheduling']:
+			op = ScalrOp.NULL
+		else:
+			# check scaling trigger conditions from backlog
+			op = self.__check_scaling_trigger() 
 
 		if op == ScalrOp.DOWN and m_curr == 1:
 			log.debug('\tIgnore DOWN operation since m_curr=1')
-		elif op == ScalrOp.UP or op == ScalrOp.DOWN:
+		else:
 			if self.conf['backlog_aware']:
 				m = self.__estimate_m_backlog_aware(workload, m_curr, op)
 			elif self.conf['forecast_uncertainty_aware']:
-				m = self.__estimate_m_forecast_uncertainty_aware(workload)
+				m = self.__estimate_m_forecast_uncertainty_aware(workload, m_curr)
 			else:
 				m = self.__estimate_m(workload)
 

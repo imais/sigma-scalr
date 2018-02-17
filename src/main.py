@@ -31,6 +31,7 @@ def parse_args():
 	# scheduling options
 	parser.add_argument('-mua',	'--mst_uncertainty_aware', action='store_true')
 	parser.add_argument('-fua', '--forecast_uncertainty_aware', action='store_true')
+	parser.add_argument('-fem', '--forecast_effective_mst', action='store_true')
 	parser.add_argument('-ba',	'--backlog_aware', action='store_true')
 	parser.add_argument('-bua',	'--backlog_uncertainty_aware', action='store_true')
 	parser.add_argument('-ol',  '--online_learning', action='store_true')
@@ -47,8 +48,14 @@ def init_conf(args):
 			conf['arima_pdq'] = make_tuple(conf['arima_pdq'])
 	else:
 		conf = args
+
+	# enforce flag dependencies
 	if conf['backlog_uncertainty_aware']:
 		conf['backlog_aware'] = True
+	if conf['forecast_effective_mst']:
+		conf['forecast_uncertainty_aware'] = True
+	if conf['fixed_interval_scheduling']:
+		conf['backlog_aware'] = False
 
 	return conf
 
@@ -56,6 +63,8 @@ def init_conf(args):
 def check_conf(conf):
 	if conf['backlog_aware']:
 		assert(not(conf['mst_uncertainty_aware'] or conf['forecast_uncertainty_aware']))
+	assert((self.conf['cooldown_steps'] > self.conf['startup_steps']) and
+		   (self.conf['cooldown_steps'] > self.conf['reconfig_steps']))
 
 
 def main(conf):

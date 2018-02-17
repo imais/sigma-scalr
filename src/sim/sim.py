@@ -51,7 +51,7 @@ class Sim(object):
 		cooldown_steps = 0
 		state = ScalrState.READY
 
-		while t < T:
+		while t < 30:
 			(backlog, mst_tru) = self.compute_backlog(self.workload[t], m_curr, self.timestep_sec)
 			self.scalr.put_workload(self.workload[t])
 			self.scalr.put_backlog(backlog)
@@ -65,17 +65,24 @@ class Sim(object):
 				if op == ScalrOp.UP and m_curr < m_next:
 					state = ScalrState.STARTUP
 					startup_steps = self.conf['startup_steps']
+					cooldown_steps = self.conf['cooldown_steps']
 					log.debug('\t### SCALING UP ###: {} -> {}'.format(m_curr, m_next))
 				elif op == ScalrOp.DOWN and m_curr > m_next:
 					state = ScalrState.RECONFIG
 					reconfig_steps = self.conf['reconfig_steps']
+					cooldown_steps = self.conf['cooldown_steps']
 					log.debug('\t### SCALING DOWN ###: {} -> {}'.format(m_curr, m_next))
 					m_curr = 0
-				# if m_curr == m_next, stay in READY state
+				elif self.conf['fixed_interval_scheduling']:
+					state = ScaleState.COOLDOWN
+					cooldown_steps = self.conf['cooldown_steps']
+					log.debug('\t### FIXED SCHEDULING: START COOLING DOWN###')
+				# if (not fixed_interval_scheduling) and (m_curr == m_next), stay in READY state
 
 			elif state == ScalrState.STARTUP:
 				if 0 < startup_steps:
 					startup_steps -= 1
+					cooldown_steps -= 1
 				if startup_steps == 0:
 					state = ScalrState.RECONFIG					
 					m_curr = 0
@@ -84,8 +91,8 @@ class Sim(object):
 			elif state == ScalrState.RECONFIG:
 				if 0 < reconfig_steps:
 					reconfig_steps -= 1
+					cooldown_steps -= 1
 				if reconfig_steps == 0:
-					cooldown_steps = self.conf['cooldown_steps']
 					state = ScalrState.COOLDOWN
 					m_curr = m_next
 					
