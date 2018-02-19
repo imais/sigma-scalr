@@ -63,8 +63,8 @@ def init_conf(args):
 def check_conf(conf):
 	if conf['backlog_aware']:
 		assert(not(conf['mst_uncertainty_aware'] or conf['forecast_uncertainty_aware']))
-	assert((self.conf['cooldown_steps'] > self.conf['startup_steps']) and
-		   (self.conf['cooldown_steps'] > self.conf['reconfig_steps']))
+	assert((conf['cooldown_steps'] > conf['startup_steps']) and
+		   (conf['cooldown_steps'] > conf['reconfig_steps']))
 
 
 def main(conf):

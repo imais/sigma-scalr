@@ -18,7 +18,7 @@
     "mst_data_file": "data/mst/mst_data.tsv" ,
     "startup_steps": 1,
     "reconfig_steps": 1,
-    "cooldown_steps": 10,
+    "cooldown_steps": 9,
     "lookahead_steps": 10,
     "fixed_interval_scheduling": true,
     "t_sim_start": 3,

@@ -44,6 +44,8 @@ class Sim(object):
 
 		T = self.workload.size
 		t = self.conf['t_sim_start']
+		for i in range(0, t):
+			self.scalr.put_workload(self.workload[i])
 		t_report = T / self.conf['num_reports']
 		m_curr, op = self.scalr.make_decision(self.workload[t], 1)
 		startup_steps = 0
@@ -51,7 +53,7 @@ class Sim(object):
 		cooldown_steps = 0
 		state = ScalrState.READY
 
-		while t < 30:
+		while t < T:
 			(backlog, mst_tru) = self.compute_backlog(self.workload[t], m_curr, self.timestep_sec)
 			self.scalr.put_workload(self.workload[t])
 			self.scalr.put_backlog(backlog)
@@ -62,19 +64,20 @@ class Sim(object):
 			if state == ScalrState.READY:
 				# we make scaling decisions only when we are in READY state
 				m_next, op = self.scalr.make_decision(self.workload[t], m_curr)
-				if op == ScalrOp.UP and m_curr < m_next:
+				log.debug('\tdecision: m_next={}, op={}'.format(m_next, op))
+				if m_curr < m_next:
 					state = ScalrState.STARTUP
 					startup_steps = self.conf['startup_steps']
 					cooldown_steps = self.conf['cooldown_steps']
 					log.debug('\t### SCALING UP ###: {} -> {}'.format(m_curr, m_next))
-				elif op == ScalrOp.DOWN and m_curr > m_next:
+				elif m_curr > m_next:
 					state = ScalrState.RECONFIG
 					reconfig_steps = self.conf['reconfig_steps']
 					cooldown_steps = self.conf['cooldown_steps']
 					log.debug('\t### SCALING DOWN ###: {} -> {}'.format(m_curr, m_next))
 					m_curr = 0
 				elif self.conf['fixed_interval_scheduling']:
-					state = ScaleState.COOLDOWN
+					state = ScalrState.COOLDOWN
 					cooldown_steps = self.conf['cooldown_steps']
 					log.debug('\t### FIXED SCHEDULING: START COOLING DOWN###')
 				# if (not fixed_interval_scheduling) and (m_curr == m_next), stay in READY state

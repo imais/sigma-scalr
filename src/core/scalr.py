@@ -44,17 +44,29 @@ class Scalr(object):
 	def __compute_effective_mst(self, m_curr, m_next, S, D, L):
 		# S: Startup time, D: Downtime, L: Lookahead time
 		if (m_curr,m_next,S,D,L) in self.effective_mst_dict:
-			return self.effective_mst_dict[(m_curr,m_next,S,D,L)]
+			return self.effective_mst_dict[(m_curr,m_next,S,D,L)], self.effective_mst_dict['std']
+		elif (m_next,D,L) in self.effective_mst_dict:
+			return self.effective_mst_dict[(m_next,D,L)], self.effective_mst_dict['std']
 
 		# m vs. time:
 		# m: | m_curr |  0  | m_next |
 		# t: |<--S--->|<-D->| 
 		# t: |<----------L---------->|
-		total_mst = self.mst_model.predict(m_curr) * S
+		total_mst = 0 if S == 0 else self.mst_model.predict(m_curr) * S
 		total_mst += self.mst_model.predict(m_next) * (L - (S + D))
 		effective_mst = total_mst / L
-		self.effective_mst_dict[(m_curr,m_next,S,D,L)] = effective_mst
-		return effective_mst
+
+		if 'std' not in self.effective_mst_dict:
+			# https://stats.stackexchange.com/questions/168971/variance-of-an-average-of-random-variables
+			var = ((self.mst_model.std**2) * (L - D)) / L**2
+			self.effective_mst_dict['std'] = np.sqrt(var)
+
+		if S == 0:
+			# ignore m_curr & S
+			self.effective_mst_dict[(m_next,D,L)] = effective_mst
+		else:
+			self.effective_mst_dict[(m_curr,m_next,S,D,L)] = effective_mst
+		return effective_mst, self.effective_mst_dict['std']
 
 
 	def __put_workload(self, workload):
@@ -105,14 +117,14 @@ class Scalr(object):
 				S = self.conf['startup_steps'] if m > m_curr else 0
 				D = self.conf['reconfig_steps']
 				L = self.conf['lookahead_steps']
-				mst_pred = self.__compute_effective_mst(m_curr, m, S, D, L)
+				mst_pred, mst_std = self.__compute_effective_mst(m_curr, m, S, D, L)
 			else:
-				mst_pred = self.mst_model.predict(m)
+				mst_pred, mst_std = self.mst_model.predict(m), self.mst_model.std
 			delta = mst_pred - workload_pred
 
 			variance = 0.0
 			if self.conf['mst_uncertainty_aware']:
-				variance += self.mst_model.std**2
+				variance += mst_std**2
 			if self.conf['forecast_uncertainty_aware']:
 				variance += workload_std**2
 
@@ -206,7 +218,7 @@ class Scalr(object):
 		workload = forecast[max_index]
 		workload_std = std[max_index]
 
-		return self.__estimate_m(workload, workload_std, m_curr, op)
+		return self.__estimate_m(workload, workload_std, m_curr)
 
 	
 	def make_decision(self, workload, m_curr):
