@@ -3,6 +3,7 @@ import json
 import logging
 import logging.config
 import os
+import time
 from ast import literal_eval as make_tuple
 from sim.sim import Sim
 
@@ -24,7 +25,6 @@ def parse_args():
 	parser.add_argument('-s',	'--series', default='wcup', type=str)
 	parser.add_argument('-m',	'--model', default='model1', type=str)
 	parser.add_argument('-p',	'--arima_pdq', default='(1,0,0)', type=str)
-	parser.add_argument('-n',	'--num_tests', default=1, type=int)
 	parser.add_argument('-r',	'--rho', default=0.95, type=float)
 	parser.add_argument('-cf',	'--conf', default='./conf/conf.json', type=str)
 	parser.add_argument('-sim', '--simulation', action='store_true')
@@ -48,6 +48,19 @@ def init_conf(args):
 			conf['arima_pdq'] = make_tuple(conf['arima_pdq'])
 	else:
 		conf = args
+
+	results_dir = "./results/"
+	if not os.path.exists(results_dir):
+		os.makedirs(results_dir)
+	results_file = results_dir + str(int(time.time())) + \
+				   '_' + conf['app'] + \
+				   '_rho=' + str(args.rho) + \
+						   ('_mua' if conf['mst_uncertainty_aware'] else '') + \
+						   ('_ol'  if conf['online_learning'] else '') + \
+						   ('_fua' if conf['forecast_uncertainty_aware'] else '') + \
+						   ('_fem' if conf['forecast_effective_mst'] else '') + \
+						   ".tsv"
+	conf['results_file'] = results_file
 
 	# enforce flag dependencies
 	if conf['backlog_uncertainty_aware']:

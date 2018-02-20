@@ -64,7 +64,7 @@ class MstModel(object):
 			self.mst = self.__compute_mst(self.m_train)
 			self.std = self.__compute_std(self.m_train, self.mst_train)
 			self.num_training += 1
-			self.ready = True
+
 
 
 	def __compute_mst(self, m):
@@ -73,6 +73,7 @@ class MstModel(object):
 		for m_ in range(1, self.m_max+1):
 			mst_peak = max(self.__compute(m_), mst_peak)
 			mst.append(mst_peak)
+		self.ready = True
 		return mst
 
 
