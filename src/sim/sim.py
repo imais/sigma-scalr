@@ -40,7 +40,7 @@ class Sim(object):
 
 
 	def start(self):
-		log.info('Starting simulation')
+		log.info('Starting simulated scheduling')
 
 		T = self.workload.size
 		t = self.conf['t_sim_start']

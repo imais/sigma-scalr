@@ -6,6 +6,7 @@ import os
 import time
 from ast import literal_eval as make_tuple
 from sim.sim import Sim
+from realtime.realtime import RealTime
 
 log = logging.getLogger()
 
@@ -86,7 +87,8 @@ def main(conf):
 		s = Sim(conf)
 		s.start()
 	else:
-		log.info('Real-time mode to be implemented')
+		r = RealTime(conf)
+		r.start()
 
 	
 if __name__ == '__main__':

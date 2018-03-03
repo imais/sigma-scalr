@@ -26,6 +26,12 @@
     "workload_window_size": 100,
     "backlog_window_size": 10,
     "backlog_scaleup_threshold": 20,
-    "backlog_scaledown_threshold": 5
+    "backlog_scaledown_threshold": 5,
+    "realtime": {
+        "metrics_server_host": "localhost",
+        "metrics_server_port": 9999,
+        "timestep_sec": 3,
+        "scheduling_interval_sec": 60
+    }
 }
 
