@@ -6,7 +6,8 @@ import socket
 
 from util.results import Results
 from core.scalr import Scalr, ScalrState, ScalrOp
-# from cloud import CloudManager, InstanceState
+from cloud import CloudManager
+from spe import SpeManager
 
 BUFFER_SIZE = 1024
 
@@ -20,6 +21,8 @@ class RealTime(object):
 		self.metrics = {}
 		self.new_instances = []
 		self.scalr = Scalr(conf)
+		self.cloud_manager = CloudManager(conf)
+		self.spe_manager = SpeManager(conf)
 
 		# connect to metrics server
 		self.sock_metrics_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -29,7 +32,7 @@ class RealTime(object):
 		log.info('Connected to metrics server {}:{}'.format(host, port))
 
 
-	def __update_metrics(self):
+	def __get_metrics(self):
 		args = {'args': ['bytesin']}
 		req = 'get ' + json.dumps(args)
 		self.sock_metrics_server.send(req)
@@ -39,17 +42,18 @@ class RealTime(object):
 		if resp.startswith('ok'):
 			self.metrics = json.loads(resp[3:])
 
-	# def __scale(self, m_curr, m_next):
-	# 	# add    new instances for (m_next - m_curr) or
-	# 	# remove extra instances for (m_curr - m_next)
-	# 	# obtain ids in self.new_instances
+	def __scale(self, m_curr, m_next):
+		result = True
 
-
-	# def __check_if_instances_running(self):
-	# 	ready = False
-	# 	# check states for newly allocated instances
-	# 	# if all the instances are running, return True
-	# 	return ready
+		if m_curr < m_next:
+			if not self.cloud_manager(m_next - m_curr):
+				result = False
+		elif m_curr > m_next:
+			# we keep one instance at least
+			if not self.cloud_manager(max(m_curr - m_next, 1)):
+				restul = False
+			
+		return result
 
 
 	# def __reconfig_app(self):
@@ -65,52 +69,52 @@ class RealTime(object):
 		
 		while True:
 			loop_start_sec = time.time()
-			self.__update_metrics()
+			self.__get_metrics()
 			workload = self.metrics['bytesin']	# could use 'bytesin_1min'
 			self.scalr.put_workload(workload)
 			log.info('workload: {}'.format(workload))
 
-			# # state machine
-			# if state == ScalrState.READY:
-			# 	# we make scaling decisions only when we are in READY state
-			# 	m_next, op = self.scalr.make_decision(workload, m_curr)
-			# 	log.debug('decision: m_next={}, op={}'.format(m_next, op))
-			# 	if m_curr < m_next:
-			# 		self.__scale(m_curr, m_next)
-			# 		state = ScalrState.STARTUP
-			# 		log.debug('### SCALING UP ###: {} -> {}'.format(m_curr, m_next))
-			# 	elif m_curr > m_next:
-			# 		self.__scale(m_curr, m_next)
-			# 		m_curr = m_next
-			# 		self.__reconfig_app()
-			# 		state = ScalrState.RECONFIG
-			# 		log.debug('### SCALING DOWN ###: {} -> {}'.format(m_curr, m_next))
+			# state machine
+			if state == ScalrState.READY:
+				# we make scaling decisions only when we are in READY state
+				m_next, op = self.scalr.make_decision(workload, m_curr)
+				log.debug('decision: m_next={}, op={}'.format(m_next, op))
+				if m_curr < m_next:
+					self.__scale(m_curr, m_next)
+					state = ScalrState.STARTUP
+					log.debug('### SCALING UP ###: {} -> {}'.format(m_curr, m_next))
+				elif m_curr > m_next:
+					self.__scale(m_curr, m_next)
+					m_curr = m_next
+					self.__reconfig_app()
+					state = ScalrState.RECONFIG
+					log.debug('### SCALING DOWN ###: {} -> {}'.format(m_curr, m_next))
 
-			# 	# if (not fixed_interval_scheduling) and m_curr == m_next, stay READY
+				# if (not fixed_interval_scheduling) and m_curr == m_next, stay READY
 
-			# 	if self.conf['fixed_interval_scheduling'] or m_curr != m_next:
-			# 		if self.conf['fixed_interval_scheduling'] and m_curr == m_next:
-			# 			state = ScalrState.COOLDOWN
-			# 			log.debug('### COOLING DOWN ###')
-			# 		next_scheduling_time = time.time() + self.conf['scheduling_interval_sec']
+				if self.conf['fixed_interval_scheduling'] or m_curr != m_next:
+					if self.conf['fixed_interval_scheduling'] and m_curr == m_next:
+						state = ScalrState.COOLDOWN
+						log.debug('### COOLING DOWN ###')
+					next_scheduling_time = time.time() + self.conf['scheduling_interval_sec']
 
-			# elif state == ScalrState.STARTUP:
-			# 	# since we do not want to block this event loop, poll instance states
-			# 	if self.__check_if_instances_ready():
-			# 		m_curr = m_next
-			# 		self.__reconfig_app()
-			# 		state = ScalrState.RECONFIG
+			elif state == ScalrState.STARTUP:
+				# since we do not want to block this event loop, poll instance states
+				if self.cloud_manager.new_instances_all_running():
+					m_curr = m_next
+					self.__reconfig_app()
+					state = ScalrState.RECONFIG
 
-			# elif state == ScalrState.RECONFIG:
-			# 	if self.__check_if_app_reconfigured():
-			# 		state = ScalrState.COOLDOWN
+			elif state == ScalrState.RECONFIG:
+				if self.spe_manager.done_reconfig():
+					state = ScalrState.COOLDOWN
 					
-			# elif state == ScalrState.COOLDOWN:
-			# 	if time.time() > next_scheduling_time:
-			# 		state = ScalrState.READY
+			elif state == ScalrState.COOLDOWN:
+				if time.time() > next_scheduling_time:
+					state = ScalrState.READY
 
-			# else:
-			# 	log.error('Invalid state: {}'.format(str(state)))
+			else:
+				log.error('Invalid state: {}'.format(str(state)))
 
 			sleep_sec = self.timestep_sec - (time.time() - loop_start_sec)
 			time.sleep(sleep_sec)

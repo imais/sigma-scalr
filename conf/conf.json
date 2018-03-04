@@ -31,7 +31,11 @@
         "metrics_server_host": "localhost",
         "metrics_server_port": 9999,
         "timestep_sec": 3,
-        "scheduling_interval_sec": 60
+        "scheduling_interval_sec": 60,
+        "cloud_provider": "EC2",
+        "base_filters": {
+            "tag:Name": "Slave*"
+        }
     }
 }
 
