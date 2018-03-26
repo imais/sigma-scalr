@@ -42,18 +42,10 @@ class RealTime(object):
 		if resp.startswith('ok'):
 			self.metrics = json.loads(resp[3:])
 
-	def __scale(self, m_curr, m_next):
-		result = True
-
-		if m_curr < m_next:
-			if not self.cloud_manager(m_next - m_curr):
-				result = False
-		elif m_curr > m_next:
-			# we keep one instance at least
-			if not self.cloud_manager(max(m_curr - m_next, 1)):
-				restul = False
 			
-		return result
+	def __scale(self, m_next):
+		# at least we keep one instance
+		return self.cloud_manager.request_instances(max(m_next, 1))
 
 
 	# def __reconfig_app(self):
@@ -100,7 +92,7 @@ class RealTime(object):
 
 			elif state == ScalrState.STARTUP:
 				# since we do not want to block this event loop, poll instance states
-				if self.cloud_manager.new_instances_all_running():
+				if self.cloud_manager.check_if_new_instances_running():
 					m_curr = m_next
 					self.__reconfig_app()
 					state = ScalrState.RECONFIG
