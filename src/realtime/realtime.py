@@ -19,10 +19,10 @@ class RealTime(object):
 		self.conf = conf
 		self.timestep_sec = self.conf['realtime']['timestep_sec']
 		self.metrics = {}
-		self.new_instances = []
 		self.scalr = Scalr(conf)
 		self.cloud_manager = CloudManager(conf)
-		self.spe_manager = SpeManager(conf)
+		master_nodes = self.cloud_manager.get_instances(self.conf['realtime']['master_filter'])
+		self.spe_manager = SpeManager(conf, self.cloud_manager, master_nodes[0])
 
 		# connect to metrics server
 		self.sock_metrics_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -48,9 +48,6 @@ class RealTime(object):
 		return self.cloud_manager.request_instances(max(m_next, 1))
 
 
-	# def __reconfig_app(self):
-	# 	# re-deploy application over the current instances
-		
 		
 	def start(self):
 		log.info('Starting realtime scheduling')
@@ -92,13 +89,13 @@ class RealTime(object):
 
 			elif state == ScalrState.STARTUP:
 				# since we do not want to block this event loop, poll instance states
-				if self.cloud_manager.check_if_new_instances_running():
+				if self.cloud_manager.new_instances_started():
 					m_curr = m_next
-					self.__reconfig_app()
+					self.spe_manager.reconfig()
 					state = ScalrState.RECONFIG
 
 			elif state == ScalrState.RECONFIG:
-				if self.spe_manager.done_reconfig():
+				if self.spe_manager.reconfig_done():
 					state = ScalrState.COOLDOWN
 					
 			elif state == ScalrState.COOLDOWN:
