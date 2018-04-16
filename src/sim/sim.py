@@ -24,7 +24,7 @@ class Sim(object):
 		self.mst_tru = MstTru(conf['mst_data_file'], conf['app'])
 		self.workload = self.read_workload(conf['workload_files'][conf['series']], 
 										   conf['norm_factors'][conf['app']])
-		self.timestep_sec = (self.workload[0:2].index[1] - self.workload[0:2].index[0]).total_seconds()
+		self.timestep_sec = int((self.workload[0:2].index[1] - self.workload[0:2].index[0]).total_seconds())
 		conf['timestep_sec'] = self.timestep_sec # scalr needs this to estimate future backlog
 		self.scalr = Scalr(conf)
 		self.backlog = 0
@@ -39,6 +39,12 @@ class Sim(object):
 		return (self.backlog, mst_tru)
 
 
+	def log_debug(self, time_sec, state_pre, state_cur, m_curr, backlog_sec, mst_tru, backlog):
+		log.debug(' {}s,\t{}->{}, m_curr={}, backlog_sec={}, mst={}, backlog={}'
+				  .format(time_sec, state_pre, state_cur, m_curr, backlog_sec, mst_tru, backlog))
+	
+
+
 	def start(self):
 		log.info('Starting simulated scheduling')
 
@@ -50,72 +56,82 @@ class Sim(object):
 		m_curr, op = self.scalr.make_decision(self.workload[t], 1)
 		startup_sec = 0
 		reconfig_sec = 0
-		backlog_time = self.timestep_sec
-		cooldown_steps = 0
+		cooldown_sec = 0
+		backlog = 0
 		state = ScalrState.READY
 
-		while t < T:
-			(backlog, mst_tru) = self.compute_backlog(self.workload[t], m_curr, backlog_time)
-			self.scalr.put_workload(self.workload[t])
-			self.scalr.put_backlog(backlog)
-			self.results.add(self.workload.index[t], m_curr, self.workload[t], mst_tru, backlog)
+		while t < 50:
+			log.debug('t={},\t{}, m_curr={}, workload={}, backlog={}'
+					  .format(t, state, m_curr, self.workload[t], backlog))
+			
+			timestep_sec = self.timestep_sec
 
-			log.debug('t={},\tstate={}, m_curr={}, workload={}, mst={}, backlog={}'.format(t, state, m_curr, self.workload[t], mst_tru, backlog))
-
-			# set default backlog_time
-			backlog_time = self.timestep_sec			
-
+			# NOTE: state can change multiple times within one timestep
+			# we make scaling decisions only when we are in READY state			
 			if state == ScalrState.READY:
-				# we make scaling decisions only when we are in READY state
 				m_next, op = self.scalr.make_decision(self.workload[t], m_curr)
-				log.debug('\tdecision: m_next={}, op={}'.format(m_next, op))
+				log.debug('\tScaling decision: m_next={}, op={}'.format(m_next, op))
 				if m_curr < m_next:
 					state = ScalrState.STARTUP
 					startup_sec = self.conf['startup_sec']
-					cooldown_steps = self.conf['cooldown_steps']
-					log.debug('\t### SCALING UP ###: {} -> {}'.format(m_curr, m_next))
+					log.debug('\t## SCALING UP: {} -> {}'.format(m_curr, m_next))
 				elif m_curr > m_next:
 					state = ScalrState.RECONFIG
 					reconfig_sec = self.conf['reconfig_sec']
-					cooldown_steps = self.conf['cooldown_steps']
-					log.debug('\t### SCALING DOWN ###: {} -> {}'.format(m_curr, m_next))
-					m_curr = 0
+					log.debug('\t## SCALING DOWN: {} -> {}'.format(m_curr, m_next))
 				elif self.conf['fixed_interval_scheduling']:
 					state = ScalrState.COOLDOWN
-					cooldown_steps = self.conf['cooldown_steps']
-					log.debug('\t### FIXED SCHEDULING: START COOLING DOWN###')
-				# if (not fixed_interval_scheduling) and (m_curr == m_next), stay in READY state
+					# log.debug('\t### START COOLING DOWN###')
+				cooldown_sec = self.conf['cooldown_sec']					
 
-			elif state == ScalrState.STARTUP:
-				if 0 <= startup_sec:
-					startup_sec -= self.conf['timestep_sec']
-					cooldown_steps -= 1
-				if startup_sec <= 0:
-					state = ScalrState.RECONFIG					
-					m_curr = 0
-					# compensate startup_sec less than timestep_sec
-					# NOTE: reconfig_sec needs to be >0 after adjustment
-					reconfig_sec = self.conf['reconfig_sec'] + startup_sec
-					backlog_time = self.timestep_sec - startup_sec
+			if state == ScalrState.STARTUP:
+				state_pre = state
+				if timestep_sec  < startup_sec:
+					startup_sec -= timestep_sec
+					backlog_sec = timestep_sec
+					timestep_sec = 0					
+				else:
+					state = ScalrState.RECONFIG
+					timestep_sec -= startup_sec
+					reconfig_sec = self.conf['reconfig_sec']
+					backlog_sec = startup_sec
+				cooldown_sec -= backlog_sec
+				backlog, mst_tru = self.compute_backlog(self.workload[t], m_curr, backlog_sec)
+				self.log_debug(self.timestep_sec - timestep_sec, state_pre, state,
+							   m_curr, backlog_sec, mst_tru, backlog)
 
-			elif state == ScalrState.RECONFIG:
-				if 0 < reconfig_sec:
-					reconfig_sec -= self.conf['timestep_sec']
-					cooldown_steps -= 1
-				if reconfig_sec <= 0:
+			if state == ScalrState.RECONFIG and 0 < timestep_sec:
+				state_pre = state
+				m_curr = 0
+				if timestep_sec < reconfig_sec:
+					reconfig_sec -= timestep_sec
+					backlog_sec = timestep_sec					
+					timestep_sec = 0
+				else:
 					state = ScalrState.COOLDOWN
-					m_curr = m_next
-					# compensate reconfig_sec less than timestep_sec
-					backlog_time = self.timestep_sec - reconfig_sec
-					
-			elif state == ScalrState.COOLDOWN:
-				if 0 < cooldown_steps:
-					cooldown_steps -= 1
-				if cooldown_steps == 0:
-					state = ScalrState.READY
+					timestep_sec -= reconfig_sec
+					backlog_sec = reconfig_sec
+				cooldown_sec -= backlog_sec					
+				backlog, mst_tru = self.compute_backlog(self.workload[t], m_curr, backlog_sec)
+				self.log_debug(self.timestep_sec - timestep_sec, state_pre, state,
+							   m_curr, backlog_sec, mst_tru, backlog)
 
-			else:
-				log.error('Invalid state: {}'.format(str(state)))
+			if state == ScalrState.COOLDOWN and 0 < timestep_sec:
+				state_pre = state
+				m_curr = m_next
+				cooldown_sec -= timestep_sec
+				if cooldown_sec <= 0:
+					state = ScalrState.READY
+				# even if there is not enough cooldown_sec left, we wait until next timestep
+				backlog_sec = timestep_sec
+				timestep_sec = 0				
+				backlog, mst_tru = self.compute_backlog(self.workload[t], m_curr, backlog_sec)
+				self.log_debug(self.timestep_sec - timestep_sec, state_pre, state,
+							   m_curr, backlog_sec, mst_tru, backlog)
+
+			self.scalr.put_workload(self.workload[t])
+			self.scalr.put_backlog(backlog)  # put latest backlog
+			self.results.add(self.workload.index[t], m_curr, self.workload[t], mst_tru, backlog)
 
 			if t % t_report == 0:
 				log.info('{}% ({}/{}) done'.format(round(100 * float(t)/T), t, T))
