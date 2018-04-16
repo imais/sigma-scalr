@@ -31,7 +31,7 @@ class CloudManager(object):
 
 	def __update_running_instances(self):
 		# list of 'libcloud.compute.base.Node' objects sorted in name
-		self.all_instances = sorted(self.driver.list_nodes(ex_filters=self.worker_filters)
+		self.all_instances = sorted(self.driver.list_nodes(ex_filters=self.worker_filters),
 									key=lambda node: node.name)
 		# assuming at least one instance is running 
 		self.running_instances = [inst for inst in self.all_instances if inst.state == 'running']
@@ -115,7 +115,7 @@ class CloudManager(object):
 		if num_instances > num_current_instances:
 			request = Request.START			
 			result = self.__start_instances(num_instances - num_current_instances)
-		else
+		else:
 			request = Request.STOP		
 			result = self.__stop_instances(num_current_instances - num_instances)
 

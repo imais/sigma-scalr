@@ -32,8 +32,5 @@ class SpeManager(object):
 		# finally, resubmit the application
 
 
-	def reconfig_done(self):
-			
-			
-
-
+	# def reconfig_done(self):
+		

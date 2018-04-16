@@ -16,8 +16,8 @@
     },
     "mst_model_file": "data/mst/mst_model.tsv",
     "mst_data_file": "data/mst/mst_data.tsv" ,
-    "startup_steps": 1,
-    "reconfig_steps": 1,
+    "startup_sec": 60,
+    "reconfig_sec": 10,
     "cooldown_steps": 9,
     "lookahead_steps": 10,
     "fixed_interval_scheduling": true,
@@ -33,9 +33,12 @@
         "timestep_sec": 3,
         "scheduling_interval_sec": 60,
         "cloud_provider": "EC2",
-        "base_filters": {
+        "spe": "Storm",
+        "worker_filters": {
             "tag:Name": "Slave*"
-        }
+        },
+        "master_filters": {
+            "tag:Name": "Nimbus"
+        }        
     }
 }
-
