@@ -2,6 +2,7 @@
 
 import logging
 import pandas as pd
+import datetime
 from util.results import Results
 from core.scalr import Scalr, ScalrState, ScalrOp
 from mst_tru import MstTru
@@ -39,10 +40,12 @@ class Sim(object):
 		return (self.backlog, mst_tru)
 
 
-	def log_debug(self, time_sec, state_pre, state_cur, m_curr, backlog_sec, mst_tru, backlog):
+	def log(self, timestamp, workload, timedelta_sec, state_pre,
+			state_cur, m_curr, mst_tru, backlog_sec, backlog):
 		log.debug(' {}s,\t{}->{}, m_curr={}, backlog_sec={}, mst={}, backlog={}'
-				  .format(time_sec, state_pre, state_cur, m_curr, backlog_sec, mst_tru, backlog))
-	
+				  .format(timedelta_sec, state_pre, state_cur, m_curr, backlog_sec, mst_tru, backlog))
+		self.results.add(timestamp + datetime.timedelta(0, timedelta_sec), m_curr,
+						 workload, mst_tru, backlog)
 
 
 	def start(self):
@@ -60,7 +63,7 @@ class Sim(object):
 		backlog = 0
 		state = ScalrState.READY
 
-		while t < 50:
+		while t < T:
 			log.debug('t={},\t{}, m_curr={}, workload={}, backlog={}'
 					  .format(t, state, m_curr, self.workload[t], backlog))
 			
@@ -81,7 +84,6 @@ class Sim(object):
 					log.debug('\t## SCALING DOWN: {} -> {}'.format(m_curr, m_next))
 				elif self.conf['fixed_interval_scheduling']:
 					state = ScalrState.COOLDOWN
-					# log.debug('\t### START COOLING DOWN###')
 				cooldown_sec = self.conf['cooldown_sec']					
 
 			if state == ScalrState.STARTUP:
@@ -97,12 +99,13 @@ class Sim(object):
 					backlog_sec = startup_sec
 				cooldown_sec -= backlog_sec
 				backlog, mst_tru = self.compute_backlog(self.workload[t], m_curr, backlog_sec)
-				self.log_debug(self.timestep_sec - timestep_sec, state_pre, state,
-							   m_curr, backlog_sec, mst_tru, backlog)
+				timedelta_sec = self.timestep_sec - timestep_sec
+				self.log(self.workload.index[t], self.workload[t], timedelta_sec,
+						 state_pre, state, m_curr, mst_tru, backlog_sec, backlog)
 
-			if state == ScalrState.RECONFIG and 0 < timestep_sec:
+			if state == ScalrState.RECONFIG and 0 <= timestep_sec:
 				state_pre = state
-				m_curr = 0
+				m_curr = m_next				
 				if timestep_sec < reconfig_sec:
 					reconfig_sec -= timestep_sec
 					backlog_sec = timestep_sec					
@@ -112,13 +115,13 @@ class Sim(object):
 					timestep_sec -= reconfig_sec
 					backlog_sec = reconfig_sec
 				cooldown_sec -= backlog_sec					
-				backlog, mst_tru = self.compute_backlog(self.workload[t], m_curr, backlog_sec)
-				self.log_debug(self.timestep_sec - timestep_sec, state_pre, state,
-							   m_curr, backlog_sec, mst_tru, backlog)
+				backlog, mst_tru = self.compute_backlog(self.workload[t], 0, backlog_sec)
+				timedelta_sec = self.timestep_sec - timestep_sec
+				self.log(self.workload.index[t], self.workload[t], timedelta_sec,
+						 state_pre, state, m_curr, mst_tru, backlog_sec, backlog)
 
-			if state == ScalrState.COOLDOWN and 0 < timestep_sec:
+			if state == ScalrState.COOLDOWN and 0 <= timestep_sec:
 				state_pre = state
-				m_curr = m_next
 				cooldown_sec -= timestep_sec
 				if cooldown_sec <= 0:
 					state = ScalrState.READY
@@ -126,13 +129,13 @@ class Sim(object):
 				backlog_sec = timestep_sec
 				timestep_sec = 0				
 				backlog, mst_tru = self.compute_backlog(self.workload[t], m_curr, backlog_sec)
-				self.log_debug(self.timestep_sec - timestep_sec, state_pre, state,
-							   m_curr, backlog_sec, mst_tru, backlog)
-
+				timedelta_sec = self.timestep_sec - timestep_sec				
+				self.log(self.workload.index[t], self.workload[t], timedelta_sec,
+						 state_pre, state, m_curr, mst_tru, backlog_sec, backlog)				
+				
 			self.scalr.put_workload(self.workload[t])
-			self.scalr.put_backlog(backlog)  # put latest backlog
-			self.results.add(self.workload.index[t], m_curr, self.workload[t], mst_tru, backlog)
-
+			self.scalr.put_backlog(backlog)
+			# self.results.add(self.workload.index[t], m_curr, self.workload[t], mst_tru, backlog)
 			if t % t_report == 0:
 				log.info('{}% ({}/{}) done'.format(round(100 * float(t)/T), t, T))
 			t += 1
