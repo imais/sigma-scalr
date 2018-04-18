@@ -140,69 +140,113 @@ class Scalr(object):
 		return m
 
 
-	def __estimate_backlog(self, backlog, workload, workload_std, m, time):
+	def __estimate_backlog(self, backlog, workload_forecast, workload_std, m, time):
 		alpha = 0.0
 		beta = 0.0
 		if self.conf['backlog_uncertainty_aware']:
 			alpha = workload_std		# 1 sigma = 68%
 			beta = self.mst_model.std	# 1 sigma = 68%
 			
-		delta = ((workload + alpha) - max(self.mst_model.predict(m) - beta, 0)) * time
+		delta = ((workload_forecast + alpha) - max(self.mst_model.predict(m) - beta, 0)) * time
 		return max(backlog + delta, 0)
 
 
-	def __estimate_m_backlog_aware(self, workload, m_curr, op):
-		assert((op == ScalrOp.DOWN) or (op == ScalrOp.UP))
+	def __estimate_future_backlogs(self, backlog, workload_forecast, workload_std, m_curr, m_next):
+		backlog_list = [backlog]
+		t = 0
+		startup_sec = 0
+		reconfig_sec = 0
 
-		forecast, ci, std = self.__forecast_workload(self.conf['lookahead_steps'])
+		if m_curr == m_next:
+			# No change
+			state = ScalrState.COOLDOWN
+		elif m_curr > m_next:
+			# Scale down: no VM startup time
+			state = ScalrState.RECONFIG
+			reconfig_sec = self.conf['reconfig_sec']
+		else:
+			# Scale up: VM startup time 
+			state = ScalrState.STARTUP
+			startup_sec = self.conf['startup_sec']
+		
+		while t < self.conf['scheduling_interval_steps']-1:
+			timestep_sec = self.conf['timestep_sec']
+
+			if state == ScalrState.STARTUP:
+				if timestep_sec < startup_sec:
+					startup_sec -= timestep_sec
+					backlog_sec = timestep_sec
+					timestep_sec = 0					
+				else:
+					state = ScalrState.RECONFIG
+					timestep_sec -= startup_sec
+					reconfig_sec = self.conf['reconfig_sec']
+					backlog_sec = startup_sec
+				backlog = self.__estimate_backlog(backlog, workload_forecast[t], workload_std[t],
+												  m_curr, backlog_sec)
+
+			if state == ScalrState.RECONFIG and 0 < timestep_sec:
+				if timestep_sec < reconfig_sec:
+					reconfig_sec -= timestep_sec
+					backlog_sec = timestep_sec					
+					timestep_sec = 0
+				else:
+					state = ScalrState.COOLDOWN
+					timestep_sec -= reconfig_sec
+					backlog_sec = reconfig_sec
+				backlog = self.__estimate_backlog(backlog, workload_forecast[t], workload_std[t],
+												  0, backlog_sec)
+				
+			if state == ScalrState.COOLDOWN and 0 < timestep_sec:
+				backlog = self.__estimate_backlog(backlog, workload_forecast[t], workload_std[t],
+												  m_next, timestep_sec)
+
+			backlog_list.append(backlog)
+			t += 1
+			
+		return backlog_list
+
+	
+	def __estimate_m_backlog_aware(self, workload, backlog, m_curr):
+		forecast, ci, std = self.__forecast_workload(self.conf['scheduling_interval_steps'])
+		B = self.conf['target_backlog']
 
 		if forecast is np.nan:
 			log.warn('No forecast is returned')
 			return self.__estimate_m(workload)
 
-		backlog = self.backlog
-		backlog_list = [backlog]
-		S = self.conf['startup_steps'] if op == ScalrOp.UP else 0
-		D = self.conf['reconfig_steps'] # 'D'owntime
-		L = self.conf['lookahead_steps']
-		
-		# [0, S) VM startup 
-		for t in range(0, S):
-			# TODO: consider std when computing delta
-			backlog = self.__estimate_backlog(backlog, forecast[t], std[t], m_curr, 
-											  self.conf['timestep_sec'])
-			backlog_list.append(backlog)
 
-		# [S, S+D): reconfiguration
-		for t in range(S, S+D):
-			backlog = self.__estimate_backlog(backlog, forecast[t], std[t], 0, 
-											  self.conf['timestep_sec'])
-			backlog_list.append(backlog)
-
-		# [S+D, L): after reconfiguration
-		for m in range(1, self.mst_model.m_max+1):
-			# TODO: search from m_curr, not from 1
-			b = backlog
-			m_found = False
-			backlog_list_ = []
-			for t in range(S+D, L):
-				b = self.__estimate_backlog(b, forecast[t], std[t], 
-											m, self.conf['timestep_sec'])
-				backlog_list_.append(b)
-				if b <= 0:
+		# first, search downward
+		if 1 < m_curr:
+			min_m, m_found = m_curr-1, False
+			for m in range(m_curr-1, 0, -1):
+				backlog_list = self.__estimate_future_backlogs(backlog, forecast, std, m_curr, m)
+				if np.mean(backlog_list) <= B:
+					min_m = m
 					m_found = True
+				else:
 					break
 			if m_found:
+				return min_m
+
+		# next, search upward (including m_curr)
+		m_found = False
+		backlog_list_dict = {}
+		for m in range(m_curr+1, self.mst_model.m_max+1):
+			backlog_list = self.__estimate_future_backlogs(backlog, forecast, std, m_curr, m)
+			# if np.mean(backlog_list) <= B or backlog_list[-1] == 0:
+			backlog_list_dict[m] = backlog_list
+			if np.mean(backlog_list) <= B:
+				m_found = True
 				break
-		
-		if m_found:
-			log.debug('\tBacklog expected be 0 in {} steps with m={}: backlog={}'.
-					  format(t+1, m, backlog_list + backlog_list_))
-		else:
-			log.warn('\tBacklog not expected to  be 0 in {} steps even with max m={}: backlog={}'.
-					 format(t+1, m, backlog_list + backlog_list_))
-		
-		return m if m_found else self.mst_model.m_max
+
+		if not m_found:
+			for m in range(m_curr+1, self.mst_model.m_max+1):
+				if backlog_list_dict[m][-1] == 0:
+					m_found = True
+					break
+			
+		return m if m_found else m_curr
 
 
 	def __estimate_m_forecast_uncertainty_aware(self, workload, m_curr):
@@ -221,7 +265,7 @@ class Scalr(object):
 		return self.__estimate_m(workload, workload_std, m_curr)
 
 	
-	def make_decision(self, workload, m_curr):
+	def make_decision(self, workload, backlog, m_curr):
 		m = m_curr
 
 		if self.conf['fixed_interval_scheduling']:
@@ -234,7 +278,7 @@ class Scalr(object):
 			log.debug('\tIgnore DOWN operation since m_curr=1')
 		else:
 			if self.conf['backlog_aware']:
-				m = self.__estimate_m_backlog_aware(workload, m_curr, op)
+				m = self.__estimate_m_backlog_aware(workload, backlog, m_curr)
 			elif self.conf['forecast_uncertainty_aware']:
 				m = self.__estimate_m_forecast_uncertainty_aware(workload, m_curr)
 			else:

@@ -68,8 +68,6 @@ def init_conf(args):
 		conf['backlog_aware'] = True
 	if conf['forecast_effective_mst']:
 		conf['forecast_uncertainty_aware'] = True
-	if conf['fixed_interval_scheduling']:
-		conf['backlog_aware'] = False
 
 	return conf
 
