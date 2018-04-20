@@ -41,34 +41,6 @@ class Scalr(object):
 		self.effective_mst_dict = {}
 
 
-	def __compute_effective_mst(self, m_curr, m_next, S, D, L):
-		# S: Startup time, D: Downtime, L: Lookahead time
-		if (m_curr,m_next,S,D,L) in self.effective_mst_dict:
-			return self.effective_mst_dict[(m_curr,m_next,S,D,L)], self.effective_mst_dict['std']
-		elif (m_next,D,L) in self.effective_mst_dict:
-			return self.effective_mst_dict[(m_next,D,L)], self.effective_mst_dict['std']
-
-		# m vs. time:
-		# m: | m_curr |  0  | m_next |
-		# t: |<--S--->|<-D->| 
-		# t: |<----------L---------->|
-		total_mst = 0 if S == 0 else self.mst_model.predict(m_curr) * S
-		total_mst += self.mst_model.predict(m_next) * (L - (S + D))
-		effective_mst = total_mst / L
-
-		if 'std' not in self.effective_mst_dict:
-			# https://stats.stackexchange.com/questions/168971/variance-of-an-average-of-random-variables
-			var = ((self.mst_model.std**2) * (L - D)) / L**2
-			self.effective_mst_dict['std'] = np.sqrt(var)
-
-		if S == 0:
-			# ignore m_curr & S
-			self.effective_mst_dict[(m_next,D,L)] = effective_mst
-		else:
-			self.effective_mst_dict[(m_curr,m_next,S,D,L)] = effective_mst
-		return effective_mst, self.effective_mst_dict['std']
-
-
 	def __put_workload(self, workload):
 		self.workload_window.put(workload)
 		if self.conf['workload_window_size'] < self.workload_window.qsize():
@@ -326,25 +298,14 @@ class Scalr(object):
 
 	
 	def make_decision(self, workload, backlog, m_curr):
-		m = m_curr
-
-		if self.conf['fixed_interval_scheduling']:
-			op = ScalrOp.NULL
+		if self.conf['backlog_aware']:
+			m = self.__estimate_m_backlog_aware(workload, backlog, m_curr)
+		elif self.conf['forecast_uncertainty_aware']:
+			m = self.__estimate_m_forecast_uncertainty_aware(workload, m_curr)
 		else:
-			# check scaling trigger conditions from backlog
-			op = self.__check_scaling_trigger() 
+			m = self.__estimate_m(workload)
 
-		if op == ScalrOp.DOWN and m_curr == 1:
-			log.debug('\tIgnore DOWN operation since m_curr=1')
-		else:
-			if self.conf['backlog_aware']:
-				m = self.__estimate_m_backlog_aware(workload, backlog, m_curr)
-			elif self.conf['forecast_uncertainty_aware']:
-				m = self.__estimate_m_forecast_uncertainty_aware(workload, m_curr)
-			else:
-				m = self.__estimate_m(workload)
-
-		return m, op
+		return m
 
 
 	def put_backlog(self, backlog):

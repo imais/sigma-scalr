@@ -77,8 +77,8 @@ class Sim(object):
 			# NOTE: state can change multiple times within one timestep
 			# we make scaling decisions only when we are in READY state			
 			if state == ScalrState.READY:
-				m_next, op = self.scalr.make_decision(self.workload[t], backlog, m_curr)
-				log.debug('\tScaling decision: m_next={}, op={}'.format(m_next, op))
+				m_next = self.scalr.make_decision(self.workload[t], backlog, m_curr)
+				log.debug('\tScaling decision: m_next={}'.format(m_next))
 				if m_curr < m_next:
 					state = ScalrState.STARTUP
 					startup_sec = self.conf['startup_sec']
@@ -87,7 +87,7 @@ class Sim(object):
 					state = ScalrState.RECONFIG
 					reconfig_sec = self.conf['reconfig_sec']
 					log.debug('\t## SCALING DOWN: {} -> {}'.format(m_curr, m_next))
-				elif self.conf['fixed_interval_scheduling']:
+				else:
 					state = ScalrState.COOLDOWN
 				interval_sec = self.conf['scheduling_interval_sec']
 

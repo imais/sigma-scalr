@@ -32,7 +32,6 @@ def parse_args():
 	# scheduling options
 	parser.add_argument('-mua',	'--mst_uncertainty_aware', action='store_true')
 	parser.add_argument('-fua', '--forecast_uncertainty_aware', action='store_true')
-	parser.add_argument('-fem', '--forecast_effective_mst', action='store_true')
 	parser.add_argument('-ba',	'--backlog_aware', action='store_true')
 	parser.add_argument('-bua',	'--backlog_uncertainty_aware', action='store_true')
 	parser.add_argument('-ol',  '--online_learning', action='store_true')
