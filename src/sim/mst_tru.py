@@ -25,10 +25,12 @@ class MstTru(object):
 		if m <= 0 or self.m_max < m:
 			return 0
 
+		# return self.mst_mean[m - 1]
 		while True:
 			rnd = norm.rvs(loc=self.mst_mean[m - 1], scale=self.mst_std[m - 1], size=1)[0]
 			if (0 < rnd):
 				break;
 
 		return rnd
+
 

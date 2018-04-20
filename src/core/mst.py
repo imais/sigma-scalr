@@ -104,7 +104,7 @@ class MstModel(object):
 		self.m_max = max(m_train, self.m_max)
 		self.m_train = np.append(self.m_train, m_train)
 		self.mst_train = np.append(self.mst_train, mst_train)
-		self.train()
+		self.__train()
 
 
 	def predict(self, m):

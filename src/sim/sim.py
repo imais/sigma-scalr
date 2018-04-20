@@ -35,7 +35,7 @@ class Sim(object):
 		self.scalr = Scalr(conf)
 		self.backlog = 0
 		self.conf = conf
-		self.results = Results()
+		self.results = Results(conf['target_backlog'])
 	
 
 	def compute_backlog(self, workload, m, time):
@@ -105,8 +105,8 @@ class Sim(object):
 				interval_sec -= backlog_sec
 				backlog, mst_tru = self.compute_backlog(self.workload[t], m_curr, backlog_sec)
 				timedelta_sec = self.timestep_sec - timestep_sec
-				self.log(timestamp, self.workload[t], timedelta_sec, state_pre, state,
-						 m_curr, mst_tru, backlog_sec, backlog)
+				# self.log(timestamp, self.workload[t], timedelta_sec, state_pre, state,
+				# 		 m_curr, mst_tru, backlog_sec, backlog)
 				timestamp += datetime.timedelta(0, timedelta_sec)				
 
 			if state == ScalrState.RECONFIG and 0 < timestep_sec:
@@ -123,8 +123,8 @@ class Sim(object):
 				interval_sec -= backlog_sec					
 				backlog, mst_tru = self.compute_backlog(self.workload[t], 0, backlog_sec)
 				timedelta_sec = self.timestep_sec - timestep_sec
-				self.log(timestamp, self.workload[t], timedelta_sec, state_pre, state,
-						 m_curr, mst_tru, backlog_sec, backlog)
+				# self.log(timestamp, self.workload[t], timedelta_sec, state_pre, state,
+				# 		 m_curr, mst_tru, backlog_sec, backlog)
 				timestamp += datetime.timedelta(0, timedelta_sec)
 
 			if state == ScalrState.COOLDOWN and 0 < timestep_sec:
@@ -137,12 +137,15 @@ class Sim(object):
 				timestep_sec = 0				
 				backlog, mst_tru = self.compute_backlog(self.workload[t], m_curr, backlog_sec)
 				timedelta_sec = self.timestep_sec - timestep_sec				
-				self.log(timestamp, self.workload[t], timedelta_sec,
-						 state_pre, state, m_curr, mst_tru, backlog_sec, backlog)				
+				# self.log(timestamp, self.workload[t], timedelta_sec,
+				# 		 state_pre, state, m_curr, mst_tru, backlog_sec, backlog)
+
+			if self.conf['online_learning'] and mst_tru < self.workload[t]:
+				self.scalr.mst_model_update(m_curr, mst_tru)
 				
 			self.scalr.put_workload(self.workload[t])
 			self.scalr.put_backlog(backlog)
-			# self.results.add(self.workload.index[t], m_curr, self.workload[t], mst_tru, backlog)
+			self.results.add(self.workload.index[t], m_curr, self.workload[t], mst_tru, backlog)
 			if t % t_report == 0:
 				log.info('{}% ({}/{}) done'.format(round(100 * float(t)/T), t, T))
 			t += 1

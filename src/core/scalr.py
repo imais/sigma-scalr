@@ -168,7 +168,8 @@ class Scalr(object):
 			# Scale up: VM startup time 
 			state = ScalrState.STARTUP
 			startup_sec = self.conf['startup_sec']
-		
+
+		cooldown = False
 		while t < self.conf['scheduling_interval_steps']-1:
 			timestep_sec = self.conf['timestep_sec']
 
@@ -200,14 +201,66 @@ class Scalr(object):
 			if state == ScalrState.COOLDOWN and 0 < timestep_sec:
 				backlog = self.__estimate_backlog(backlog, workload_forecast[t], workload_std[t],
 												  m_next, timestep_sec)
+				cooldown = True
 
-			backlog_list.append(backlog)
+			if cooldown:
+				backlog_list.append(backlog)
 			t += 1
 			
 		return backlog_list
 
 	
 	def __estimate_m_backlog_aware(self, workload, backlog, m_curr):
+		forecast, ci, std = self.__forecast_workload(self.conf['scheduling_interval_steps'])
+		B = self.conf['target_backlog']
+
+		if forecast is np.nan:
+			log.warn('No forecast is returned')
+			return self.__estimate_m(workload)
+
+
+		# first, search downward
+		if 1 < m_curr:
+			min_m, m_found = m_curr-1, False
+			for m in range(m_curr-1, 0, -1):
+				# backlog_list only contains backlogs after m is active
+				backlog_list = self.__estimate_future_backlogs(backlog, forecast, std, m_curr, m)
+				if max(backlog_list) <= B:
+					min_m = m
+					m_found = True
+				else:
+					break
+			if m_found:
+				return min_m
+
+		# next, search upward (including m_curr)
+		backlog_max_prev = -1.0
+		backlog_list_dict = {}
+		m_found = False
+		for m in range(m_curr, self.mst_model.m_max+1):
+			backlog_list = self.__estimate_future_backlogs(backlog, forecast, std, m_curr, m)
+			backlog_list_dict[m] = backlog_list
+			backlog_max = max(backlog_list)
+			if backlog_max == backlog_max_prev:
+				# no more improvment, exit with prev m
+				m = m - 1
+				m_found = True
+				break
+			elif backlog_max <= B:
+				m_found = True
+				break
+			backlog_max_prev = backlog_max
+
+		# if not m_found:
+		# 	for m in range(m_curr+1, self.mst_model.m_max+1):
+		# 		if backlog_list_dict[m][-1] == 0:
+		# 			m_found = True
+		# 			break
+			
+		return m
+
+
+	def __estimate_m_backlog_aware_avg(self, workload, backlog, m_curr):
 		forecast, ci, std = self.__forecast_workload(self.conf['scheduling_interval_steps'])
 		B = self.conf['target_backlog']
 
@@ -230,27 +283,34 @@ class Scalr(object):
 				return min_m
 
 		# next, search upward (including m_curr)
-		m_found = False
+		backlog_avg_prev = -1.0
 		backlog_list_dict = {}
-		for m in range(m_curr+1, self.mst_model.m_max+1):
+		m_found = False
+		for m in range(m_curr, self.mst_model.m_max+1):
 			backlog_list = self.__estimate_future_backlogs(backlog, forecast, std, m_curr, m)
-			# if np.mean(backlog_list) <= B or backlog_list[-1] == 0:
 			backlog_list_dict[m] = backlog_list
-			if np.mean(backlog_list) <= B:
+			backlog_avg = np.mean(backlog_list)
+			if backlog_avg == backlog_avg_prev:
+				# no more improvment, exit with prev m
+				m = m - 1
 				m_found = True
 				break
+			elif backlog_avg <= B:
+				m_found = True
+				break
+			backlog_avg_prev = backlog_avg
 
-		if not m_found:
-			for m in range(m_curr+1, self.mst_model.m_max+1):
-				if backlog_list_dict[m][-1] == 0:
-					m_found = True
-					break
+		# if not m_found:
+		# 	for m in range(m_curr+1, self.mst_model.m_max+1):
+		# 		if backlog_list_dict[m][-1] == 0:
+		# 			m_found = True
+		# 			break
 			
-		return m if m_found else m_curr
+		return m	
 
 
 	def __estimate_m_forecast_uncertainty_aware(self, workload, m_curr):
-		forecast, ci, std = self.__forecast_workload(self.conf['lookahead_steps'])
+		forecast, ci, std = self.__forecast_workload(self.conf['scheduling_interval_steps'])
 
 		if forecast is np.nan:
 			log.warn('No forecast is returned')
@@ -289,10 +349,11 @@ class Scalr(object):
 
 	def put_backlog(self, backlog):
 		self.__put_backlog(backlog)
-			
-	def put_workload(self, workload):
-		self.__put_workload(workload)
-		
 
 		
-	
+	def put_workload(self, workload):
+		self.__put_workload(workload)
+
+
+	def mst_model_update(self, m, workload):
+		self.mst_model.update(m, workload)

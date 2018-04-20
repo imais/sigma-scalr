@@ -3,8 +3,9 @@ import numpy as np
 
 class Results(object):
 
-	def __init__(self):
+	def __init__(self, target_backlog):
 		self.df = pd.DataFrame(columns=['m', 'workload', 'mst_tru', 'backlog'])
+		self.target_backlog = target_backlog
 
 
 	def add(self, datetime, m, workload, mst_tru, backlog):
@@ -12,12 +13,12 @@ class Results(object):
 
 		
 	def print_stats(self):
-		violations = [1.0 if row['workload'] > row['mst_tru'] else 0 for index, row in self.df.iterrows()]
-		print('Stats: %.3f, %.3f, %.3f, %.3f' % 
+		# violations = [1.0 if row['workload'] > row['mst_tru'] else 0 for index, row in self.df.iterrows()]
+		violations = [1.0 if row['backlog'] <= self.target_backlog else 0 for index, row in self.df.iterrows()]		
+		print('Stats: %.3f, %.3f, %.3f' % 
 			  (100 * np.mean(violations), 
 			   np.mean(self.df['m']), 
-			   np.mean(self.df['backlog']),
-			   (np.mean(self.df['backlog']) / np.mean(self.df['workload']))))
+			   np.mean(self.df['backlog'])))
 
 
 	def write_results(self, file):
