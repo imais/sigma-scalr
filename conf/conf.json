@@ -19,7 +19,6 @@
     "startup_sec": 60,
     "reconfig_sec": 90,
     "scheduling_interval_steps": 10,
-    "target_wait_sec": 60,
     "t_sim_start": 3,
     "num_reports": 20,
     "workload_window_size": 100,

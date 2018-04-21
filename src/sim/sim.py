@@ -29,13 +29,10 @@ class Sim(object):
 		self.timestep_sec = int((self.workload[0:2].index[1] - self.workload[0:2].index[0]).total_seconds())
 		conf['timestep_sec'] = self.timestep_sec
 		conf['scheduling_interval_sec'] = self.timestep_sec * conf['scheduling_interval_steps']
-		# L [bytes] = lambda [bytes/sec] * W [sec]
-		conf['target_backlog'] = np.mean(self.workload) * conf['target_wait_sec']
-		log.info('target_wait_sec={}, target_backlog={}'.format(conf['target_wait_sec'], conf['target_backlog']))
 		self.scalr = Scalr(conf)
 		self.backlog = 0
 		self.conf = conf
-		self.results = Results(conf['target_backlog'])
+		self.results = Results()
 	
 
 	def compute_backlog(self, workload, m, time):
@@ -73,6 +70,7 @@ class Sim(object):
 			
 			timestep_sec = self.timestep_sec
 			timestamp = self.workload.index[t]
+			self.scalr.put_workload(self.workload[t])
 
 			# NOTE: state can change multiple times within one timestep
 			# we make scaling decisions only when we are in READY state			
@@ -143,8 +141,7 @@ class Sim(object):
 			if self.conf['online_learning'] and mst_tru < self.workload[t]:
 				self.scalr.mst_model_update(m_curr, mst_tru)
 				
-			self.scalr.put_workload(self.workload[t])
-			self.scalr.put_backlog(backlog)
+			self.scalr.put_backlog(backlog)	# backlog at the end of time t
 			self.results.add(self.workload.index[t], m_curr, self.workload[t], mst_tru, backlog)
 			if t % t_report == 0:
 				log.info('{}% ({}/{}) done'.format(round(100 * float(t)/T), t, T))

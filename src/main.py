@@ -32,9 +32,10 @@ def parse_args():
 	# scheduling options
 	parser.add_argument('-mua',	'--mst_uncertainty_aware', action='store_true')
 	parser.add_argument('-fua', '--forecast_uncertainty_aware', action='store_true')
+	parser.add_argument('-ol',  '--online_learning', action='store_true')	
 	parser.add_argument('-ba',	'--backlog_aware', action='store_true')
-	parser.add_argument('-bua',	'--backlog_uncertainty_aware', action='store_true')
-	parser.add_argument('-ol',  '--online_learning', action='store_true')
+	parser.add_argument('-bam',	'--backlog_amortize', action='store_true')
+
 	args = parser.parse_args()
 
 	return args
@@ -58,15 +59,11 @@ def init_conf(args):
 						   ('_mua' if conf['mst_uncertainty_aware'] else '') + \
 						   ('_ol'  if conf['online_learning'] else '') + \
 						   ('_fua' if conf['forecast_uncertainty_aware'] else '') + \
-						   ('_fem' if conf['forecast_effective_mst'] else '') + \
+						   ('_ba'  if conf['backlog_aware'] else '') + \
 						   ".tsv"
 	conf['results_file'] = results_file
 
 	# enforce flag dependencies
-	if conf['backlog_uncertainty_aware']:
-		conf['backlog_aware'] = True
-	if conf['forecast_effective_mst']:
-		conf['forecast_uncertainty_aware'] = True
 
 	return conf
 
