@@ -142,7 +142,8 @@ class Sim(object):
 				self.scalr.mst_model_update(m_curr, mst_tru)
 				
 			self.scalr.put_backlog(backlog)	# backlog at the end of time t
-			self.results.add(self.workload.index[t], m_curr, self.workload[t], mst_tru, backlog)
+			self.results.add(self.workload.index[t],
+							 state, m_curr, self.workload[t], mst_tru, backlog)
 			if t % t_report == 0:
 				log.info('{}% ({}/{}) done'.format(round(100 * float(t)/T), t, T))
 			t += 1

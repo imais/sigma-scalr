@@ -17,7 +17,7 @@
     "mst_model_file": "data/mst/mst_model.tsv",
     "mst_data_file": "data/mst/mst_data.tsv" ,
     "startup_sec": 60,
-    "reconfig_sec": 90,
+    "reconfig_sec": 32,
     "scheduling_interval_steps": 10,
     "t_sim_start": 3,
     "num_reports": 20,
