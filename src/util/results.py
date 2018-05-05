@@ -9,8 +9,9 @@ log = logging.getLogger()
 
 class Results(object):
 
-	def __init__(self):
+	def __init__(self, id=''):
 		self.df = pd.DataFrame(columns=['state', 'm', 'workload', 'mst_tru', 'backlog'])
+		self.id = id
 
 
 	def add(self, datetime, state, m, workload, mst_tru, backlog):
@@ -22,8 +23,8 @@ class Results(object):
 		ready_df = self.df[self.df.state == ScalrState.READY]
 		satisfactions = [1.0 if row['backlog'] == 0 else 0 for index, row in ready_df.iterrows()]
 		
-		log.info('Stats: %.3f, %.3f, %.3f, %.3f' %
-				 (np.mean(self.df.m), np.mean(self.df.backlog),
+		log.info('Stats(%s): %.3f, %.3f, %.3f, %.3f' %
+				 (self.id, np.mean(self.df.m), np.mean(self.df.backlog),
 				  100*np.mean(satisfactions), np.mean(ready_df.backlog)))
 
 

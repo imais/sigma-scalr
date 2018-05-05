@@ -32,7 +32,7 @@ class Sim(object):
 		self.scalr = Scalr(conf)
 		self.backlog = 0
 		self.conf = conf
-		self.results = Results()
+		self.results = Results(conf['sched_opt'])
 	
 
 	def compute_backlog(self, workload, m, time):
@@ -128,18 +128,17 @@ class Sim(object):
 			if state == ScalrState.COOLDOWN and 0 < timestep_sec:
 				state_pre = state
 				interval_sec -= timestep_sec
-				if interval_sec <= 0:
-					state = ScalrState.READY
+
 				# even if there is not enough interval_sec left, we wait until next timestep
 				backlog_sec = timestep_sec
 				timestep_sec = 0				
 				backlog, mst_tru = self.compute_backlog(self.workload[t], m_curr, backlog_sec)
-				timedelta_sec = self.timestep_sec - timestep_sec				
-				# self.log(timestamp, self.workload[t], timedelta_sec,
-				# 		 state_pre, state, m_curr, mst_tru, backlog_sec, backlog)
+				timedelta_sec = self.timestep_sec - timestep_sec
 
-			if self.conf['online_learning'] and mst_tru < self.workload[t]:
-				self.scalr.mst_model_update(m_curr, mst_tru)
+				if interval_sec <= 0:
+					state = ScalrState.READY				
+					if self.conf['online_learning'] and mst_tru < self.workload[t]:
+						self.scalr.mst_model_update(m_curr, mst_tru)
 				
 			self.scalr.put_backlog(backlog)	# backlog at the end of time t
 			self.results.add(self.workload.index[t],

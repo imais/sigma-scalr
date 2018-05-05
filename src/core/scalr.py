@@ -314,9 +314,11 @@ class Scalr(object):
 	
 	def make_decision(self, workload, backlog, m_curr):
 		if self.conf['backlog_aware']:
+			backlog = 0 if self.conf['backlog_aware_proactive'] else backlog			
 			m = self.__estimate_m_backlog_aware(workload, backlog, m_curr)
 		elif self.conf['backlog_amortize']:
-			m = self.__estimate_m_backlog_amortize(workload, backlog, m_curr)			
+			backlog = 0 if self.conf['backlog_amortize_proactive'] else backlog
+			m = self.__estimate_m_backlog_amortize(workload, backlog, m_curr)
 		elif self.conf['forecast_uncertainty_aware']:
 			m = self.__estimate_m_forecast_uncertainty_aware(workload, m_curr)
 		else:

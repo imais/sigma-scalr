@@ -34,7 +34,10 @@ def parse_args():
 	parser.add_argument('-fua', '--forecast_uncertainty_aware', action='store_true')
 	parser.add_argument('-ol',  '--online_learning', action='store_true')	
 	parser.add_argument('-ba',	'--backlog_aware', action='store_true')
+	parser.add_argument('-bap',	'--backlog_aware_proactive', action='store_true')		
 	parser.add_argument('-bam',	'--backlog_amortize', action='store_true')
+	parser.add_argument('-bamp','--backlog_amortize_proactive', action='store_true')			
+
 
 	args = parser.parse_args()
 
@@ -53,17 +56,25 @@ def init_conf(args):
 	results_dir = "./results/"
 	if not os.path.exists(results_dir):
 		os.makedirs(results_dir)
+	sched_opt = ('_mua' if conf['mst_uncertainty_aware'] else '') + \
+				('_ol'  if conf['online_learning'] else '') + \
+				('_fua' if conf['forecast_uncertainty_aware'] else '') + \
+				('_ba'  if conf['backlog_aware'] else '') + \
+				('_bap' if conf['backlog_aware_proactive'] else '') + \
+				('_bam' if conf['backlog_amortize'] else '') + \
+				('_bamp' if conf['backlog_amortize_proactive'] else '')
+	conf['sched_opt'] = sched_opt[1:] if 1 <= len(sched_opt) else 'none'
 	results_file = results_dir + str(int(time.time())) + \
 				   '_' + conf['app'] + \
-				   '_rho=' + str(args.rho) + \
-						   ('_mua' if conf['mst_uncertainty_aware'] else '') + \
-						   ('_ol'  if conf['online_learning'] else '') + \
-						   ('_fua' if conf['forecast_uncertainty_aware'] else '') + \
-						   ('_ba'  if conf['backlog_aware'] else '') + \
-						   ".tsv"
+				   '_rho=' + str(args.rho) + '_' + conf['sched_opt'] + \
+				   ".tsv"
 	conf['results_file'] = results_file
 
 	# enforce flag dependencies
+	if conf['backlog_aware_proactive']:
+		conf['backlog_aware'] = True
+	if conf['backlog_amortize_proactive']:	
+		conf['backlog_amortize'] = True
 
 	return conf
 
@@ -71,8 +82,7 @@ def init_conf(args):
 def check_conf(conf):
 	if conf['backlog_aware']:
 		assert(not(conf['mst_uncertainty_aware'] or conf['forecast_uncertainty_aware']))
-	# assert((conf['cooldown_steps'] > conf['startup_steps']) and
-	# 	   (conf['cooldown_steps'] > conf['reconfig_steps']))
+
 
 
 def main(conf):
