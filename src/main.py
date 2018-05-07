@@ -35,9 +35,6 @@ def parse_args():
 	parser.add_argument('-ol',  '--online_learning', action='store_true')	
 	parser.add_argument('-ba',	'--backlog_aware', action='store_true')
 	parser.add_argument('-bap',	'--backlog_aware_proactive', action='store_true')		
-	parser.add_argument('-bam',	'--backlog_amortize', action='store_true')
-	parser.add_argument('-bamp','--backlog_amortize_proactive', action='store_true')			
-
 
 	args = parser.parse_args()
 
@@ -60,9 +57,7 @@ def init_conf(args):
 				('_ol'  if conf['online_learning'] else '') + \
 				('_fua' if conf['forecast_uncertainty_aware'] else '') + \
 				('_ba'  if conf['backlog_aware'] else '') + \
-				('_bap' if conf['backlog_aware_proactive'] else '') + \
-				('_bam' if conf['backlog_amortize'] else '') + \
-				('_bamp' if conf['backlog_amortize_proactive'] else '')
+				('_bap' if conf['backlog_aware_proactive'] else '')
 	conf['sched_opt'] = sched_opt[1:] if 1 <= len(sched_opt) else 'none'
 	results_file = results_dir + str(int(time.time())) + \
 				   '_' + conf['app'] + \
@@ -73,8 +68,6 @@ def init_conf(args):
 	# enforce flag dependencies
 	if conf['backlog_aware_proactive']:
 		conf['backlog_aware'] = True
-	if conf['backlog_amortize_proactive']:	
-		conf['backlog_amortize'] = True
 
 	return conf
 

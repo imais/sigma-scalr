@@ -10,12 +10,12 @@ log = logging.getLogger()
 class Results(object):
 
 	def __init__(self, id=''):
-		self.df = pd.DataFrame(columns=['state', 'm', 'workload', 'mst_tru', 'backlog'])
+		self.df = pd.DataFrame(columns=['t', 'state', 'm', 'workload', 'mst_tru', 'backlog'])
 		self.id = id
 
 
-	def add(self, datetime, state, m, workload, mst_tru, backlog):
-		self.df.loc[datetime] = [state, m, workload, mst_tru, backlog];
+	def add(self, datetime, t, state, m, workload, mst_tru, backlog):
+		self.df.loc[datetime] = [t, state, m, workload, mst_tru, backlog];
 
 		
 	def print_stats(self):

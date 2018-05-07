@@ -57,7 +57,7 @@ class Sim(object):
 		for i in range(0, t):
 			self.scalr.put_workload(self.workload[i])
 		t_report = T / self.conf['num_reports']
-		m_curr = 1
+		m_curr = 3
 		startup_sec = 0
 		reconfig_sec = 0
 		interval_sec = 0
@@ -75,31 +75,26 @@ class Sim(object):
 			# NOTE: state can change multiple times within one timestep
 			# we make scaling decisions only when we are in READY state			
 			if state == ScalrState.READY:
-				m_next = self.scalr.make_decision(self.workload[t], backlog, m_curr)
-				log.debug('\tScaling decision: m_next={}'.format(m_next))
-				if m_curr < m_next:
+				m_next, op = self.scalr.make_decision(self.workload[t], backlog, m_curr)
+				log.debug('\t### Scaling decision: m_next={}, op={}'.format(m_next, op))
+				if op != ScalrOp.NULL:
 					state = ScalrState.STARTUP
 					startup_sec = self.conf['startup_sec']
-					log.debug('\t## SCALING UP: {} -> {}'.format(m_curr, m_next))
-				elif m_curr > m_next:
-					state = ScalrState.RECONFIG
-					reconfig_sec = self.conf['reconfig_sec']
-					log.debug('\t## SCALING DOWN: {} -> {}'.format(m_curr, m_next))
 				else:
-					state = ScalrState.COOLDOWN
+					state = ScalrState.WORK
 				interval_sec = self.conf['scheduling_interval_sec']
 
 			if state == ScalrState.STARTUP:
 				state_pre = state
-				if timestep_sec  < startup_sec:
+				if timestep_sec < startup_sec:
 					startup_sec -= timestep_sec
 					backlog_sec = timestep_sec
-					timestep_sec = 0					
+					timestep_sec = 0
 				else:
-					state = ScalrState.RECONFIG
 					timestep_sec -= startup_sec
+					backlog_sec = startup_sec					
+					state = ScalrState.RECONFIG
 					reconfig_sec = self.conf['reconfig_sec']
-					backlog_sec = startup_sec
 				interval_sec -= backlog_sec
 				backlog, mst_tru = self.compute_backlog(self.workload[t], m_curr, backlog_sec)
 				timedelta_sec = self.timestep_sec - timestep_sec
@@ -115,7 +110,7 @@ class Sim(object):
 					backlog_sec = timestep_sec					
 					timestep_sec = 0
 				else:
-					state = ScalrState.COOLDOWN
+					state = ScalrState.WORK
 					timestep_sec -= reconfig_sec
 					backlog_sec = reconfig_sec
 				interval_sec -= backlog_sec					
@@ -125,7 +120,7 @@ class Sim(object):
 				# 		 m_curr, mst_tru, backlog_sec, backlog)
 				timestamp += datetime.timedelta(0, timedelta_sec)
 
-			if state == ScalrState.COOLDOWN and 0 < timestep_sec:
+			if state == ScalrState.WORK and 0 < timestep_sec:
 				state_pre = state
 				interval_sec -= timestep_sec
 
@@ -141,7 +136,7 @@ class Sim(object):
 						self.scalr.mst_model_update(m_curr, mst_tru)
 				
 			self.scalr.put_backlog(backlog)	# backlog at the end of time t
-			self.results.add(self.workload.index[t],
+			self.results.add(self.workload.index[t], t,
 							 state, m_curr, self.workload[t], mst_tru, backlog)
 			if t % t_report == 0:
 				log.info('{}% ({}/{}) done'.format(round(100 * float(t)/T), t, T))
