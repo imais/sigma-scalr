@@ -73,9 +73,7 @@ def init_conf(args):
 
 
 def check_conf(conf):
-	if conf['backlog_aware']:
-		assert(not(conf['mst_uncertainty_aware'] or conf['forecast_uncertainty_aware']))
-
+	pass
 
 
 def main(conf):

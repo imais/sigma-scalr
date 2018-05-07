@@ -1,6 +1,6 @@
 #!/bin/bash
 
-NUM_TESTS=2
+NUM_TESTS=3
 
 # apps=(grep rcount visitor pv clean vhtree collision twitter)
 apps=(grep)
@@ -28,23 +28,11 @@ for i in `seq 1 ${NUM_TESTS}` ; do
 
             common_cmd="python src/main.py --sim --app ${app} --rho ${rho} --series ${series} --model ${model} --arima_pdq ${arima_pdq}"
 
-            # ${common_cmd} 
-            # ${common_cmd} -mua
-            # ${common_cmd} -mua -fua
-            # ${common_cmd} -mua -ol -fua
-            # ${common_cmd} -fem
-            # ${common_cmd} -fem -mua
-            # ${common_cmd} -fem -mua -ol
             ${common_cmd}
-            ${common_cmd} -mua
-            ${common_cmd} -mua -fua
-            ${common_cmd} -mua -fua -ol
-            ${common_cmd} -ba
-            ${common_cmd} -ba -ol
-            ${common_cmd} -bam
-            ${common_cmd} -bam -mua
-            ${common_cmd} -bam -mua -fua
-            ${common_cmd} -bam -mua -fua -ol            
+            ${common_cmd} -ol
+            ${common_cmd} -ol -mua
+            ${common_cmd} -ol -mua -fua
+            ${common_cmd} -ol -mua -fua -ba
         done
     done
 done
