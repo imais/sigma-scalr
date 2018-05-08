@@ -27,7 +27,7 @@ class MstTru(object):
 
 		# return self.mst_mean[m - 1]
 		while True:
-			rnd = norm.rvs(loc=self.mst_mean[m - 1], scale=self.mst_std[m - 1], size=1)[0]
+			rnd = norm.rvs(loc=self.mst_mean[m], scale=self.mst_std[m], size=1)[0]
 			if (0 < rnd):
 				break;
 

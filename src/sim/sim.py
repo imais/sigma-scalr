@@ -7,6 +7,7 @@ import numpy as np
 from util.results import Results
 from core.scalr import Scalr, ScalrState, ScalrOp
 from mst_tru import MstTru
+from cpu_util import CpuUtil
 
 
 log = logging.getLogger()
@@ -19,11 +20,12 @@ class Sim(object):
 			return workload
 		else:
 			scale = norm_factor / workload.max()
-			return workload.multiply(scale)		
+			return workload.multiply(scale)
 
-
+		
 	def __init__(self, conf):
 		self.mst_tru = MstTru(conf['mst_data_file'], conf['app'])
+		self.cpu_util = CpuUtil(conf['cpu_util_file'], conf['app'], self.mst_tru)		
 		self.workload = self.read_workload(conf['workload_files'][conf['series']], 
 										   conf['norm_factors'][conf['app']])
 		self.timestep_sec = int((self.workload[0:2].index[1] - self.workload[0:2].index[0]).total_seconds())
@@ -33,6 +35,16 @@ class Sim(object):
 		self.backlog = 0
 		self.conf = conf
 		self.results = Results(conf['sched_opt'])
+
+
+	def __get_cpu_util(self, workload, backlog, m_curr):
+		cpu_samples = [self.cpu_util.sample(m_curr, workload, backlog) for i in range(0, m_curr)]
+		if self.conf['step_scaling_min']:
+			return min(cpu_samples)
+		elif self.conf['step_scaling_max']:
+			return max(cpu_samples)
+		else:
+			return np.mean(cpu_samples)				
 	
 
 	def compute_backlog(self, workload, m, time):
@@ -75,7 +87,11 @@ class Sim(object):
 			# NOTE: state can change multiple times within one timestep
 			# we make scaling decisions only when we are in READY state			
 			if state == ScalrState.READY:
-				m_next, op = self.scalr.make_decision(self.workload[t], backlog, m_curr)
+				if self.conf['step_scaling']:
+					cpu_util = self.__get_cpu_util(self.workload[t], backlog, m_curr)
+				else:
+					cpu_util = 0.0
+				m_next, op = self.scalr.make_decision(self.workload[t], backlog, m_curr, cpu_util)
 				log.debug('\t### Scaling decision: m_next={}, op={}'.format(m_next, op))
 				if op != ScalrOp.NULL:
 					state = ScalrState.STARTUP

@@ -310,9 +310,21 @@ class Scalr(object):
 
 		return self.__estimate_m(workload, workload_std)
 
+
+	# for simulation only
+	def __estimate_m_step_scaling(self, workload, backlog, m_curr, cpu_util):
+		for idx, cpu_util_bound in enumerate(self.conf['step_scaling_conf']['cpu_util_bounds']):
+			if cpu_util <= cpu_util_bound:
+				break
+		scaling_adjustment = float(self.conf['step_scaling_conf']['scaling_adjustments'][idx-1]) / 100.
+		m_next = int(round((1.0 + scaling_adjustment) * m_curr))
+		return min(max(m_next, 1), self.mst_model.m_max)
+
 	
-	def make_decision(self, workload, backlog, m_curr):
-		if self.conf['backlog_aware']:
+	def make_decision(self, workload, backlog, m_curr, cpu_util=0.0):
+		if self.conf['step_scaling']:
+			m = self.__estimate_m_step_scaling(workload, backlog, m_curr, cpu_util)
+		elif self.conf['backlog_aware']:
 			backlog = 0 if self.conf['backlog_aware_proactive'] else backlog			
 			m = self.__estimate_m_backlog_aware(workload, backlog)
 		elif self.conf['forecast_uncertainty_aware']:

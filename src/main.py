@@ -34,7 +34,11 @@ def parse_args():
 	parser.add_argument('-fua', '--forecast_uncertainty_aware', action='store_true')
 	parser.add_argument('-ol',  '--online_learning', action='store_true')	
 	parser.add_argument('-ba',	'--backlog_aware', action='store_true')
-	parser.add_argument('-bap',	'--backlog_aware_proactive', action='store_true')		
+	parser.add_argument('-bap',	'--backlog_aware_proactive', action='store_true')
+	# step-scaling options
+	parser.add_argument('-sav', '--step_scaling_avg', action='store_true')
+	parser.add_argument('-smn', '--step_scaling_min', action='store_true')
+	parser.add_argument('-smx', '--step_scaling_max', action='store_true')		
 
 	args = parser.parse_args()
 
@@ -57,7 +61,10 @@ def init_conf(args):
 				('_ol'  if conf['online_learning'] else '') + \
 				('_fua' if conf['forecast_uncertainty_aware'] else '') + \
 				('_ba'  if conf['backlog_aware'] else '') + \
-				('_bap' if conf['backlog_aware_proactive'] else '')
+				('_bap' if conf['backlog_aware_proactive'] else '') + \
+				('_sav' if conf['step_scaling_avg'] else '') + \
+				('_smn' if conf['step_scaling_min'] else '') + \
+				('_smx' if conf['step_scaling_max'] else '')				
 	conf['sched_opt'] = sched_opt[1:] if 1 <= len(sched_opt) else 'none'
 	results_file = results_dir + str(int(time.time())) + \
 				   '_' + conf['app'] + \
@@ -68,6 +75,9 @@ def init_conf(args):
 	# enforce flag dependencies
 	if conf['backlog_aware_proactive']:
 		conf['backlog_aware'] = True
+
+	if conf['step_scaling_avg'] or conf['step_scaling_min'] or conf['step_scaling_max']:
+		conf['step_scaling'] = True
 
 	return conf
 
