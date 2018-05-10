@@ -8,6 +8,7 @@ class MstTru(object):
          df = pd.DataFrame.from_csv(mst_data_file, sep='\t', header=0)
          return df.loc[df['app'] == app]
 
+	 
 	def __init__(self, mst_data_file, app):
 		mst_df = self.__read_mst_data(mst_data_file, app)
 
@@ -33,4 +34,7 @@ class MstTru(object):
 
 		return rnd
 
+
+	def predict(self, m):
+		return self.mst_mean[m]
 

@@ -130,6 +130,7 @@ class Scalr(object):
 		if m_curr == m_next:
 			# No change
 			state = ScalrState.WORK
+			backlog_sec = self.conf['timestep_sec']			
 		elif m_curr > m_next:
 			# Scale down: no VM startup time
 			state = ScalrState.RECONFIG
@@ -257,7 +258,7 @@ class Scalr(object):
 		return backlog_cap
 	
 	
-	def __estimate_m_backlog_aware(self, workload, backlog):
+	def __estimate_m_backlog_aware(self, backlog, workload):
 		lookahead_steps = self.conf['scheduling_interval_steps'] + (self.conf['startup_sec'] / self.conf['timestep_sec']) + 1
 		forecast, ci, std = self.__forecast_workload(lookahead_steps)
 
@@ -311,22 +312,12 @@ class Scalr(object):
 		return self.__estimate_m(workload, workload_std)
 
 
-	# for simulation only
-	def __estimate_m_step_scaling(self, workload, backlog, m_curr, cpu_util):
-		for idx, cpu_util_bound in enumerate(self.conf['step_scaling_conf']['cpu_util_bounds']):
-			if cpu_util <= cpu_util_bound:
-				break
-		scaling_adjustment = float(self.conf['step_scaling_conf']['scaling_adjustments'][idx-1]) / 100.
-		m_next = int(round((1.0 + scaling_adjustment) * m_curr))
-		return min(max(m_next, 1), self.mst_model.m_max)
 
 	
-	def make_decision(self, workload, backlog, m_curr, cpu_util=0.0):
-		if self.conf['step_scaling']:
-			m = self.__estimate_m_step_scaling(workload, backlog, m_curr, cpu_util)
-		elif self.conf['backlog_aware']:
+	def make_decision(self, backlog, workload, m_curr):
+		if self.conf['backlog_aware']:
 			backlog = 0 if self.conf['backlog_aware_proactive'] else backlog			
-			m = self.__estimate_m_backlog_aware(workload, backlog)
+			m = self.__estimate_m_backlog_aware(backlog, workload)
 		elif self.conf['forecast_uncertainty_aware']:
 			m = self.__estimate_m_forecast_uncertainty_aware(workload)
 		else:
