@@ -16,7 +16,6 @@
     },
     "mst_model_file": "data/mst/mst_model.tsv",
     "mst_data_file": "data/mst/mst_data.tsv",
-    "cpu_util_file": "data/cpu_util.tsv",    
     "startup_sec": 67,
     "reconfig_sec": 32,
     "scheduling_interval_steps": 10,
@@ -43,5 +42,10 @@
     "step_scaling_conf": {
         "cpu_util_bounds" : [0, 10, 20, 30, 70, 80, 90, 100],
         "scaling_adjustments": [-30, -20, -10, 0, 10, 20, 30]
+    },
+    "cpu_util_dist": "dweibull",
+    "cpu_util_files": {
+        "norm": "data/cpu_util/norm.tsv",
+        "dweibull": "data/cpu_util/dweibull.tsv"
     }
 }

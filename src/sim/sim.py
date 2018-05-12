@@ -31,7 +31,7 @@ class Sim(object):
 		
 	def __init__(self, conf):
 		self.mst_tru = MstTru(conf['mst_data_file'], conf['app'])
-		self.cpu_util = CpuUtil(conf['cpu_util_file'], conf['app'], self.mst_tru)		
+		self.cpu_util = CpuUtil(conf, self.mst_tru)		
 		self.workload = self.read_workload(conf['workload_files'][conf['series']], 
 										   conf['norm_factors'][conf['app']])
 		self.timestep_sec = int((self.workload[0:2].index[1] - self.workload[0:2].index[0]).total_seconds())

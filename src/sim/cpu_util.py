@@ -9,13 +9,23 @@ class CpuUtil(object):
 		return df.loc[df['app'] == app]
 
 	
-	def __init__(self, cpu_util_file, app, mst_tru):
-		# linearly interpolate mean and std, both arrays are 0-based		
-		cpu_df = self.__read_cpu_util(cpu_util_file, app)
+	def __init__(self, conf, mst_tru):
 		self.m_max = max(cpu_df['m'])
 		self.mst = mst_tru.mst_mean
-		self.cpu_mean = np.interp(range(0, self.m_max + 1), cpu_df['m'], cpu_df['mean'])
-		self.cpu_std = np.interp(range(0, self.m_max + 1), cpu_df['m'], cpu_df['std'])
+		self.conf = conf		
+		self.cpu_util_dist = conf['cpu_util_dist']		
+
+		# linearly interpolate mean and std, both arrays are 0-based
+		cpu_df = self.__read_cpu_util(conf['cpu_util_files'][self.cpu_util_dist], conf['app'])
+		if self.cpu_util_dist == 'norm':
+			self.loc = np.interp(range(0, self.m_max + 1), cpu_df['m'], cpu_df['mean'])
+			self.scale = np.interp(range(0, self.m_max + 1), cpu_df['m'], cpu_df['std'])
+		elif self.cpu_util_dist == 'dweibull':
+			self.c = np.interp(range(0, self.m_max + 1), cpu_df['m'], cpu_df['c'])
+			self.loc = np.interp(range(0, self.m_max + 1), cpu_df['m'], cpu_df['loc'])
+			self.scale = np.interp(range(0, self.m_max + 1), cpu_df['m'], cpu_df['scale'])
+		else:
+			pass
 
 
 	def sample(self, m, workload, backlog):
@@ -23,12 +33,16 @@ class CpuUtil(object):
 			return 0
 
 		while True:
-			rnd = norm.rvs(loc=self.cpu_mean[m], scale=self.cpu_std[m], size=1)[0]
+			if self.cpu_util_dist == 'norm':			
+				rnd = norm.rvs(loc=self.loc[m], scale=self.scale[m], size=1)[0]
+			elif self.cpu_util_dist == 'dweibull':
+				rnd = dweibull.rvs(self.c[m], loc=self.loc[m], scale=self.scale[m])[0]
+				
 			if (0 < rnd):
 				break;
 
 		# cpu util is proportinal to the processing load
-		load_intensity = min((workload + backlog) / self.mst[m], 1.0)
+		load_intensity = min((workload + backlog / self.conf['timestep_sec'] ) / self.mst[m], 1.0)
 
 		# at most 100%
 		return min(load_intensity * rnd, 100.0)
