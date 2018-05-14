@@ -113,10 +113,8 @@ class Scalr(object):
 
 	
 	def __estimate_backlog_capacity(self, backlog_cap, workload_forecast, workload_std, m, time):
-		beta = 1.0
-		gamma = 1.0
-		estimated_mst = self.mst_model.predict(m) - beta * self.mst_model.std
-		estimated_workload = workload_forecast + gamma * workload_std
+		estimated_mst = self.mst_model.predict(m) - self.conf['beta'] * self.mst_model.std
+		estimated_workload = workload_forecast + self.conf['gamma'] * workload_std
 		delta = (estimated_mst - estimated_workload) * time
 		return max(backlog_cap + delta, 0)		
 
@@ -186,7 +184,8 @@ class Scalr(object):
 		t = 0		
 		T = ((startup_sec + reconfig_sec) / timestep_sec) + 1
 		backlog = 0
-		backlog_std = 0
+		backlog_var = 0.0
+		total_backlog_sec = 0
 		state = ScalrState.STARTUP		
 
 		while t < T:
@@ -210,10 +209,13 @@ class Scalr(object):
 					backlog_sec = reconfig_sec
 				backlog = self.__estimate_backlog(backlog, workload_forecast[t], workload_std[t],
 												  0, backlog_sec)
-				backlog_std += workload_std[t] * backlog_sec
+				backlog_var += workload_std[t] ** 2
+				total_backlog_sec += backlog_sec
 			t += 1
+
+		backlog_std = np.sqrt(backlog_var)
 			
-		return backlog, backlog_std
+		return backlog, backlog_std * total_backlog_sec
 
 	
 	def __estimate_backlog_extra_capacity(self, m, forecast, std):
@@ -282,8 +284,7 @@ class Scalr(object):
 		# estimated backlog at the end of reconfiguration period		
 		backlog, backlog_std = self.__estimate_reconfig_backlog(workload_with_forecast,
 																std_with_forecast)
-		alpha = 1.0
-		B = backlog + alpha * backlog_std
+		B = backlog + self.conf['alpha'] * backlog_std
 		
 		# find m that satisfies backlog constraint
 		for m in range(m_base, self.mst_model.m_max+1):

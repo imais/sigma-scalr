@@ -2,11 +2,11 @@
 
 NUM_TESTS=1
 
-apps=(grep rcount visitor pv clean vhtree collision twitter)
-# apps=(grep)
+# apps=(grep rcount visitor pv clean vhtree collision twitter)
+apps=(grep)
 
-# rhos=(0.5 0.7 0.9)
-rhos=(0.95)
+rhos=(0.5 0.7 0.9 0.95)
+# rhos=(0.95)
 
 declare -A series_
 series_=([grep]=wcup [rcount]=wcup [visitor]=wcup [pv]=wcup [clean]=wcup [vhtree]=wcup [collision]=adsb [twitter]=tweets)
@@ -28,13 +28,12 @@ for i in `seq 1 ${NUM_TESTS}` ; do
 
             common_cmd="python src/main.py --sim --app ${app} --rho ${rho} --series ${series} --model ${model} --arima_pdq ${arima_pdq}"
 
-            ${common_cmd} -st
-            ${common_cmd} -gt
-            ${common_cmd}
-            ${common_cmd} -ol
-            ${common_cmd} -ol -mua
-            ${common_cmd} -ol -mua -fua
+            # ${common_cmd} -st
+            # ${common_cmd} -gt
+            # ${common_cmd} -ol
+            # ${common_cmd} -ol -mua
             ${common_cmd} -ol -mua -fua -ba
+            # ${common_cmd} -sav
         done
     done
 done

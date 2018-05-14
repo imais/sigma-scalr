@@ -49,5 +49,8 @@
     "cpu_util_files": {
         "norm": "data/cpu_util/norm.tsv",
         "dweibull": "data/cpu_util/dweibull.tsv"
-    }
+    },
+    "alpha": 0.0,
+    "beta": 0.0,
+    "gamma": 0.0
 }

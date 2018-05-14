@@ -42,8 +42,8 @@ for index, row in df.iterrows():
 	
 	plt.subplot(3, 6, i)
 	plt.title(str(row.vm) + ' VMs')	
-	h = plt.hist(cpu_utils, normed=True, alpha=0.5)
-	plt.hist(cpu_utils, bins=range(100), normed=True, alpha=0.2)
+	# h = plt.hist(cpu_utils, normed=True, alpha=0.5)
+	plt.hist(cpu_utils, bins=range(100), normed=True, alpha=0.8, label='samples')
 
 	m, s = stats.norm.fit(cpu_utils)
 	pdf = stats.norm.pdf(lnspc, m, s)
@@ -78,6 +78,8 @@ for index, row in df.iterrows():
 	i += 1
 
 plt.tight_layout(pad=0.4, w_pad=0.25, h_pad=1.0)
+plt.xlabel('CPU Utilization [%]')
+plt.ylabel('Frequency')
 plt.legend(bbox_to_anchor=(1.8, 1), loc=2, borderaxespad=0.)
 plt.show()	
 		
