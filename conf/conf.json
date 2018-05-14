@@ -40,8 +40,10 @@
         }        
     },
     "step_scaling_conf": {
-        "cpu_util_bounds" : [0, 10, 20, 30, 70, 80, 90, 100],
-        "scaling_adjustments": [-30, -20, -10, 0, 10, 20, 30]
+        "cpu_util_bounds1" : [0, 10, 20, 30, 70, 80, 90, 100],
+        "scaling_adjustments1": [-30, -20, -10, 0, 10, 20, 30],
+        "cpu_util_bounds" : [0, 30, 70,100],
+        "scaling_adjustments": [-30, 0, 30]
     },
     "cpu_util_dist": "dweibull",
     "cpu_util_files": {
